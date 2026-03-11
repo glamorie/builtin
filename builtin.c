@@ -1,4 +1,10 @@
 #include "builtin.h"
+#if PLATFORM_WINDOWS
+#include <Windows.h>
+#pragma comment(lib, "onecore.lib")
+#else 
+#include <stdlib.h>
+#endif 
 
 u64
 MinU(u64 a, u64 b)
@@ -186,4 +192,292 @@ MemorySwap(void* A, void* B, usize Length)
     ((u8*)A)[i] = ((u8*)B)[i];
     ((u8*)B)[i] = T;
   };
+};
+
+
+#if PLATFORM_WINDOWS
+usize
+PlatformLargePageSize(void)
+{
+  return GetLargePageMinimum();
+};
+
+usize
+PlatformNormalPageSize(void)
+{
+  SYSTEM_INFO Si = {0};
+  GetSystemInfo(&Si);
+  return Si.dwPageSize;
+};
+
+void*
+PlatformReserve(usize Size)
+{
+  return VirtualAlloc(0, Size, MEM_RESERVE, PAGE_READWRITE);
+};
+
+u32
+PlatformCommitLarge(void* Base, usize Size)
+{
+  return 1;
+};
+
+u32
+PlatformCommitNormal(void* Base, usize Size)
+{
+  
+  void* Out = VirtualAlloc(Base, Size, MEM_COMMIT, PAGE_READWRITE);
+  return Out != 0;
+};
+
+void
+PlatformRelease(void* Base)
+{
+  VirtualFree(Base, 0, MEM_FREE);
+};
+
+#else // PLATFORM_UNKNOWN
+
+usize
+PlatformLargePageSize(void)
+{
+  return 1<<10;
+};
+
+usize
+PlatformNormalPageSize(void)
+{
+  return 2<<10;
+};
+
+void*
+PlatformReserve(usize Size)
+{
+  return malloc(Size);
+};
+
+u32
+PlatformCommitLarge(void* Base, usize Size)
+{
+  return 1;
+};
+
+u32
+PlatformCommitNormal(void* Base, usize Size)
+{
+  return 1;
+};
+
+void
+PlatformRelease(void* Base)
+{
+  if (Base) free(Base);
+};
+#endif // PLATFORM
+
+
+struct arena
+{
+  u8* Base;
+  usize Flags;
+  usize Granularity;
+  usize Offset;
+  usize Reserved;
+  usize Commit;
+  usize Position;
+  arena* Prev;
+  arena* Current;
+};
+
+#define _ArenaHeader (0x100)
+
+inline static usize
+ArenaAlignUp(usize Point, usize Align)
+{
+  return Point + (Align - Point % Align) % Align;
+};
+
+inline static usize
+ArenaAlignPadding(usize Point, usize Align)
+{
+  return (Align - Point % Align) % Align;
+};
+
+arena*
+ArenaMake(usize Reserve, usize Commit, usize Flags)
+{
+  usize Granularity;
+  void* Base = 0;
+  Commit = MaxU(Commit, _ArenaHeader);
+  
+  if (Flags & ArenaFlagLargePages)
+  {
+    Granularity = PlatformLargePageSize();
+    Reserve = ArenaAlignUp(Reserve, Granularity);
+    Commit = ArenaAlignUp(Commit, Granularity);
+    Base = PlatformReserve(Reserve);
+    if (!PlatformCommitLarge(Base, Commit))
+    {
+      PlatformRelease(Base);
+      Base = 0;
+    };
+  } else
+  {
+    Granularity = PlatformNormalPageSize();
+    Reserve = ArenaAlignUp(Reserve, Granularity);
+    Commit = ArenaAlignUp(Commit, Granularity);
+    Base = PlatformReserve(Reserve);
+    
+    if (!PlatformCommitNormal(Base, Commit))
+    {
+      PlatformRelease(Base);
+      Base = 0;
+    };
+  };
+  arena* Arena = Base;
+  if (Arena)
+  {
+    Arena->Base = Base;
+    Arena->Flags = Flags;
+    Arena->Granularity = Granularity;
+    Arena->Reserved = Reserve;
+    Arena->Commit = Commit;
+    Arena->Position = _ArenaHeader;
+    Arena->Offset = 0;
+    Arena->Prev = 0;
+    Arena->Current = Arena;
+  };
+  return Arena;
+};
+
+void
+ArenaTake(arena* Arena)
+{
+  while (Arena)
+  {
+    arena* Prev = Arena->Prev;
+    PlatformRelease(Arena);
+    Arena = Prev;
+  };
+};
+
+void*
+ArenaPush(arena* Arena, usize Size, usize Align)
+{
+  if (!Arena || !Size) return 0;
+  
+  Align = MaxU(Align, 1);
+  
+  Start:
+  arena* Current = Arena->Current;
+  usize Padding = ArenaAlignPadding(Arena->Position, Align);
+  
+  if (Current->Reserved < Current->Position + Padding + Size)
+  {
+    if (Arena->Flags & ArenaFlagNoChain) return 0;
+    
+    arena* Node = ArenaMake(MaxU(Size + _ArenaHeader, Current->Reserved), Size + _ArenaHeader, Current->Flags);
+    
+    if (!Node) return 0;
+    
+    Node->Prev = Current;
+    Node->Offset = Current->Offset + Current->Reserved;
+    Arena->Current =
+    Current = Node;
+    goto Start;
+  };
+  
+  if (Current->Commit < Current->Position + Padding + Size)
+  {
+    usize CommitSize = ArenaAlignUp(Current->Position + Padding + Size - Current->Commit, Current->Granularity);
+    
+    u32 CommitOk = 0;
+    if (Current->Flags & ArenaFlagLargePages) CommitOk = PlatformCommitLarge(Current->Base + Current->Position, CommitSize);
+    else CommitOk = PlatformCommitNormal(Current->Base + Current->Position, CommitSize);
+    
+    if (!CommitOk) return 0;
+    
+    Current->Commit += CommitSize;
+  };
+  
+  Current->Position += Padding;
+  void* Allocation = (void*)(Current->Base + Current->Position);
+  Current->Position += Size;
+  return Allocation;
+};
+
+void*
+ArenaPushN(arena* Arena, usize Size, usize Count, usize Align)
+{
+  return ArenaPush(Arena, Size * Count, Align);
+};
+
+void*
+ArenaZPush(arena* Arena, usize Size, usize Align)
+{
+  return MemoryZero(ArenaPush(Arena, Size, Align), Size);
+};
+
+void*
+ArenaZPushN(arena* Arena, usize Size, usize Count, usize Align)
+{
+  return MemoryZero(ArenaPushN(Arena, Size, Count, Align), Size);
+};
+
+usize
+ArenaPosition(arena* Arena)
+{
+  return Arena ? Arena->Offset + Arena->Position : 0;
+};
+
+void
+ArenaPopTo(arena* Arena, usize Position)
+{
+  if (!Arena) return;
+  
+  usize Offset = MaxU(Position, _ArenaHeader);
+  arena* Current = Arena->Current;
+  
+  while (Offset < Current->Offset)
+  {
+    arena* Prev = Current->Prev;
+    PlatformRelease(Current);
+    Current = Prev;
+  };
+  
+  Current->Offset = Offset;
+  Arena->Current = Current;
+};
+
+void
+ArenaPop(arena* Arena, usize Size)
+{
+  usize CurrentPosition = ArenaPosition(Arena);
+  if (Size < CurrentPosition)
+  {
+    ArenaPopTo(Arena, CurrentPosition - Size);
+  };
+};
+
+void
+ArenaClear(arena* Arena)
+{
+  ArenaPopTo(Arena, 0);
+};
+
+temp
+TempBegin(arena* Arena)
+{
+  temp Temp =
+  {
+    .Arena = Arena,
+    .Position = ArenaPosition(Arena)
+  };
+  return Temp;
+};
+
+void
+TempEnd(temp Temp)
+{
+  ArenaPopTo(Temp.Arena, Temp.Position);
 };

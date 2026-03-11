@@ -279,4 +279,77 @@ MemoryReverse(void* A, usize Length);
 void
 MemorySwap(void* A, void* B, usize Length);
 
+// Platform memory allocation
+
+usize
+PlatformLargePageSize(void);
+
+usize
+PlatformNormalPageSize(void);
+
+void*
+PlatformReserve(usize Size);
+
+u32
+PlatformCommitLarge(void* Base, usize Size);
+
+u32
+PlatformCommitNormal(void* Base, usize Size);
+
+void
+PlatformRelease(void* Base);
+
+// arena 
+
+// arena
+enum
+{
+  ArenaFlagLargePages = 1<<1,
+  ArenaFlagNoChain = 1<<2,
+};
+
+typedef struct arena arena;
+
+arena*
+ArenaMake(usize Reserve, usize Commit, usize Flags);
+
+void
+ArenaTake(arena* Arena);
+
+void
+ArenaPopTo(arena* Arena, usize Position);
+
+usize
+ArenaPosition(arena* Arena);
+
+void
+ArenaPop(arena* Arena, usize Size);
+
+void*
+ArenaPush(arena* Arena, usize Size, usize Align);
+
+void*
+ArenaPushN(arena* Arena, usize Size, usize Count, usize Align);
+
+void*
+ArenaZPush(arena* Arena, usize Size, usize Align);
+
+void*
+ArenaZPushN(arena* Arena, usize Size, usize Count, usize Align);
+
+typedef struct temp temp;
+struct temp
+{
+  arena* Arena;
+  usize Position;
+};
+
+temp
+TempBegin(arena* Arena);
+
+void
+TempEnd(temp Temp);
+
+#define TempScope(A) for (temp __x = TempBegin(A); !__x.Arena; __x.Arena = 0, (TempEnd(__x)))
+
 #endif /* BUILTIN_H*/
