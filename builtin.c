@@ -1569,3 +1569,380 @@ StringRindex(string String, u32 Char)
   string S = {.Value = Parts, .Length = Length};
   return StringRfind(String, S);
 };
+
+string*
+StringSplit(string String, string Sep, usize* Count, u32 Right, arena* Arena)
+{
+  string* Out = 0;
+  usize ACount = 0;
+  if (Sep.Length != 0)
+  {
+    ACount = StringCount(String);
+    Out = ArenaPushN(Arena, sizeof(string), ACount, alignof(string));
+    
+    if (Out)
+    {
+      usize k = 0;
+      for (usize i = 0; i < String.Length;)
+      {
+        usize Advance = MaxU(1, CharUtf8Advance(String.Value[i]));
+        string Slice = {.Value = String.Value + i, .Length = Advance};
+        Out[k++] = StringClone(Slice, Arena);
+        i += Advance;
+      };
+    };
+  } else 
+  {
+    ACount = StringCountSub(String, Sep) + 1;
+    Out = ArenaPushN(Arena, sizeof(string), ACount, alignof(string));
+    
+    if (Out)
+    {
+      usize Start = 0;
+      usize h = 0;
+      
+      for (usize x = 0; x < String.Length;)
+      {
+        if (String.Length < x + Sep.Length) break;
+        
+        if (MemoryEqual(String.Value + x, Sep.Value, Sep.Length))
+        {
+          string Split = {String.Value + Start, x - Start};
+          Out[h++] = StringClone(Split, Arena);
+          x += Sep.Length;
+          Start = x;
+        } else x++;
+      };
+      string Slice = {String.Value + Start, String.Length - Start};
+      Out[h++] = StringClone(Slice, Arena);
+    };
+  };
+  
+  if (Count) *Count = ACount;
+  return Out;
+};
+
+string*
+StringSplitSpace(string String, usize* Count, arena* Arena)
+{
+  usize ACount = 0;
+  
+  for (usize i = 0; 1; )
+  {
+    while (i < String.Length && CharIsSpace(String.Value[i])) i++;
+    usize x = i;
+    while (i < String.Length && !CharIsSpace(String.Value[i])) i++;
+    usize L = i - x;
+    if (L) break;
+    ACount++;
+  };
+  
+  string* Out = ArenaPushN(Arena, sizeof(string), ACount, alignof(string));
+  
+  if (Out)
+  {
+    usize k = 0;
+    for (usize i = 0; 1; )
+    {
+      while (i < String.Length && CharIsSpace(String.Value[i])) i++;
+      usize x = i;
+      while (i < String.Length && !CharIsSpace(String.Value[i])) i++;
+      usize L = i - x;
+      if (L) break;
+      string Slice = {String.Value + x, L};
+      Out[k++] = StringClone(Slice, Arena);
+    };
+  };
+  
+  if (Count) *Count = ACount;
+  return Out;  
+};
+
+static usize
+StringPeekLine(const u8* Value, usize Length)
+{
+  usize Span = 0;
+  
+  switch (Value[0])
+  {
+    case '\r':
+    {
+      if (1 < Length && Value[1] == '\n') Span = 2;
+      else Span = 1;
+    } break;
+    case '\n':
+    case '\v': 
+    case '\f': Span = 1; break;
+  };
+  return Span;
+};
+string*
+StringSplitLines(string String, usize* Count, u32 KeepEnds, arena* Arena)
+{
+  usize ACount = 0;
+  
+  for (usize i = 0; 1;)
+  {
+    usize x = i;
+    u32 LineSpan = 0;
+    
+    while (i < String.Length)
+    {
+      LineSpan = StringPeekLine(String.Value + i, String.Length - i);
+      if (LineSpan) break;
+      i++;
+    };
+    
+    usize L = i - x;
+    
+    if (!L) break;
+    x += LineSpan;
+    ACount++;
+  };
+  
+  string* Out = ArenaPushN(Arena, sizeof(string), ACount, alignof(string));
+  
+  if (Out)
+  {
+    usize k = 0;
+    for (usize i = 0; 1;)
+    {
+      usize x = i;
+      u32 LineSpan = 0;
+      
+      while (i < String.Length)
+      {
+        LineSpan = StringPeekLine(String.Value + i, String.Length - i);
+        if (LineSpan) break;
+        i++;
+      };
+      
+      usize L = i - x + KeepEnds ? LineSpan : 0;
+      if (!L) break;
+      
+      string Line = {String.Value + x, L};
+      Out[k++] = StringClone(Line, Arena);
+      i += LineSpan;
+    };
+  };
+  
+  if (Count) *Count = ACount;
+  return Out;
+};
+
+static string
+StringStrip_(string String, u32 Direction, arena* Arena)
+{
+  usize Lpadding = 0;
+  usize RPadding = 0;
+  
+  if (Direction == 0 || Direction == 2)
+  {
+    while (Lpadding < String.Length && CharIsSpace(String.Value[Lpadding])) 
+    {
+      Lpadding++;
+    };
+  };
+  
+  if (Direction == 1 || Direction == 2)
+  {
+    while (RPadding < String.Length && CharIsSpace(String.Value[String.Length - RPadding - 1]))
+    {
+      RPadding++;
+    };
+  };
+  
+  string Stripped = {String.Value + Lpadding, String.Length - MinU(String.Length, (Lpadding + RPadding))};
+  return StringClone(Stripped, Arena);
+};
+
+string
+StringStrip(string String, arena* Arena)
+{
+  return StringStrip_(String, 2, Arena);
+};
+
+string
+StringLStrip(string String, arena* Arena)
+{
+  return StringStrip_(String, 0, Arena);
+};
+
+string
+StringRStrip(string String, arena* Arena)
+{
+  return StringStrip_(String, 1, Arena);
+};
+
+string
+StringReplace(string String, string Sub, string Repl, arena* Arena)
+{
+  usize SubCount = StringCountSub(String, Sub);
+  usize OtherLength = String.Length - Sub.Length * SubCount;
+  usize Length = OtherLength + Repl.Length * SubCount;
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    if (!Sub.Length)
+    {
+      usize i = 0;
+      usize k = 0;
+      while (i < String.Length)
+      {
+        usize Advance = CharUtf8Advance(String.Value[i]);
+        
+        if (String.Length < i + Advance) break;
+        
+        if (Advance)
+        {
+          MemoryCopy(Out.Value + k, String.Value + i, Advance);
+          i += Advance;
+          k += Advance;
+        } else 
+        {
+          Out.Value[k++] = String.Value[i++];
+        };
+        MemoryCopy(Out.Value + k, Repl.Value, Repl.Length);
+        k += Repl.Length;
+      };
+    } else 
+    {
+      usize i = 0;
+      usize k = 0;
+      while (i < String.Length)
+      {
+        if (String.Length < i + Sub.Length)
+        {
+          MemoryCopy(Out.Value + k, String.Value + i, String.Length - i);
+          break;
+        };
+        
+        if (MemoryEqual(String.Value + i, Sub.Value, Sub.Length))
+        {
+          MemoryCopy(Out.Value + k, Repl.Value, Repl.Length);
+          k += Repl.Length;
+          i += Sub.Length;
+        } else 
+        {
+          Out.Value[k++] = String.Value[i++];
+        };
+      };
+    };
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringExpandTabs(string String, u32 TabSize, arena* Arena)
+{
+  usize TabCount = 0;
+  for (usize i = 0; i < String.Length; i++)
+  {
+    if (String.Value[i] == '\t') TabCount++;
+  };
+  usize Length = (String.Length - TabCount) + TabCount * TabSize;
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    usize k = 0;
+    usize Columns = 0;
+    for (usize i = 0; i < String.Length; i++)
+    {
+      if (String.Value[i] == '\t')
+      {
+        usize Spaces = TabSize - (Columns % TabSize);
+        for (usize s = 0; s < Spaces; s++) Out.Value[k++] = ' ';
+        Columns += Spaces;
+      } else
+      {
+        Out.Value[k++] = String.Value[i];
+        Columns++;
+      };
+    };
+    Out.Value[Length] = 0;
+  };
+  
+  return Out;
+};
+
+string
+StringRemovePrefix(string String, string Prefix, arena* Arena)
+{
+  if (!StringStartsWith(String, Prefix)) return String;
+  
+  string Slice = {String.Value + Prefix.Length, String.Length - Prefix.Length};
+  return StringClone(Slice, Arena);
+};
+
+string
+StringRemoveSuffix(string String, string Suffix, arena* Arena)
+{
+  if (!StringEndsWith(String, Suffix)) return String;
+  
+  string Slice = {String.Value, String.Length - Suffix.Length};
+  return StringClone(Slice, Arena);
+};
+
+usize
+StringCompare(string A, string B)
+{
+  if (A.Length != B.Length) return 0;
+  return MemoryCompare(A.Value, B.Value, A.Length);
+};
+
+u32
+StringEqual(string A, string B)
+{
+  if (A.Length != B.Length) return 0;
+  return MemoryEqual(A.Value, B.Value, A.Length);
+};
+
+u32
+StringStartsWith(string String, string Prefix)
+{
+  if (String.Length < Prefix.Length) return 0;
+  return MemoryEqual(String.Value, Prefix.Value, Prefix.Length);
+};
+
+u32
+StringEndsWith(string String, string Suffix)
+{
+  if (String.Length < Suffix.Length) return 0;
+  return MemoryEqual(String.Value + (String.Length - Suffix.Length), Suffix.Value, Suffix.Length);
+};
+
+u32
+StringContains(string String, string Sub)
+{
+  return StringFind(String, Sub) > 0;
+};
+
+usize
+StringCompareCI(string A, string B)
+{
+  usize Count = MinU(A.Length, B.Length);
+  
+  for (int i = 0; i < Count; i++) 
+  {
+    u8 a = CharToLower(A.Value[i]);
+    u8 b = CharToLower(B.Value[i]);
+    
+    if (a != b) return i;
+  };
+  return Count;
+};
+
+u32
+StringEqualCI(string A, string B)
+{
+  if (A.Length != B.Length) return 0;
+  return StringCompareCI(A, B) == A.Length;
+};

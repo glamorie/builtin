@@ -590,4 +590,25 @@ StringRemovePrefix(string String, string Prefix, arena* Arena);
 string
 StringRemoveSuffix(string String, string Prefix, arena* Arena);
 
+usize
+StringCompare(string String, string B);
+
+u32
+StringEqual(string String, string B);
+
+u32
+StringStartsWith(string String, string Prefix);
+
+u32
+StringEndsWith(string String, string Prefix);
+
+u32
+StringContains(string String, string Sub);
+
+usize
+StringCompareCI(string A, string B);
+
+u32
+StringEqualCI(string A, string B);
+
 #endif /* BUILTIN_H*/
