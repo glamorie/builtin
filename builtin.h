@@ -1,7 +1,7 @@
 #if !defined(BUILTIN_H)
 #define BUILTIN_H
 #include <stdint.h>
-
+#include <stdio.h>
 #if defined(__clang__)
   #define COMPILER_CLANG 1
   /* Platform */
@@ -122,8 +122,8 @@
   #define LANG_CPP 1
   #define LANG_C 0
 #else
-  #define LANG_CPP 1
-  #define LANG_C 0
+  #define LANG_CPP 0
+  #define LANG_C 1
 #endif 
 
 #ifndef internal
@@ -257,5 +257,26 @@ MaxF(float a, float b);
 
 float
 ClampF(float v, float a, float b);
+
+void*
+MemoryCopy(void* Dest, const void* Src, usize Length);
+
+void*
+MemorySet(void* Dest, u8 Value, usize Length);
+
+void*
+MemoryZero(void* Dest, usize Length);
+
+usize
+MemoryCompare(const void* A, const void* B, usize Length);
+
+u32
+MemoryEqual(const void* A, const void* B, usize Length);
+
+void*
+MemoryReverse(void* A, usize Length);
+
+void
+MemorySwap(void* A, void* B, usize Length);
 
 #endif /* BUILTIN_H*/
