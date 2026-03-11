@@ -507,4 +507,26 @@ StringCJoinN(const char** Strings, usize Count, string Sep, arena* Arena);
 string
 StringRange(string String, usize Start, usize End);
 
+// String transform
+string
+StringCasefold(string String, arena* Arena);
+
+string
+StringToLower(string String, arena* Arena);
+
+string
+StringToUpper(string String, arena* Arena);
+
+string
+StringSwapcase(string String, arena* Arena);
+
+string
+StringCapitalize(string String, arena* Arena);
+
+string
+StringTitle(string String, arena* Arena);
+
+string
+StringReverse(string String, arena* Arena);
+
 #endif /* BUILTIN_H*/

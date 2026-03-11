@@ -1165,3 +1165,230 @@ StringRange(string String, usize Start, usize End)
   };
   return Out;
 };
+
+typedef u32
+char_transformer(u32 Ch);
+
+static usize
+StringTransform(string String, u8* Value, usize Length, char_transformer* Transformer)
+{
+  if (!Value) Length = 0;
+  
+  usize i = 0;
+  usize k = 0;
+  while (i < String.Length)
+  {
+    usize Advance = CharUtf8Advance(String.Value[i]);
+    
+    if (Advance == 0)
+    {
+      i++;
+      continue;
+    };
+    
+    u32 Ch = Transformer(CharUtf8Decode_(String.Value + i));
+    usize Width = CharUtf8Length(Ch);
+    
+    if (k + Width <= Length)
+    {
+      CharUtf8Encode_(Ch, Value + k);
+    };
+    k += Width;
+    i += Advance;
+  };
+  return k;
+};
+
+string
+StringToLower(string String, arena* Arena)
+{
+  string Out = {0};
+  usize Length = StringTransform(String, 0, 0, CharToLower);
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    StringTransform(String, Out.Value, Out.Length, CharToLower);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringToUpper(string String, arena* Arena)
+{
+  string Out = {0};
+  usize Length = StringTransform(String, 0, 0, CharToUpper);
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    StringTransform(String, Out.Value, Out.Length, CharToUpper);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringSwapcase(string String, arena* Arena)
+{
+  string Out = {0};
+  usize Length = StringTransform(String, 0, 0, CharSwapCase);
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    StringTransform(String, Out.Value, Out.Length, CharSwapCase);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringCasefold(string String, arena* Arena)
+{
+  string Out = {0};
+  usize Length = StringTransform(String, 0, 0, CharCasefold);
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    StringTransform(String, Out.Value, Out.Length, CharCasefold);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringReverse(string String, arena* Arena)
+{
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, String.Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    Out.Length = String.Length;
+    usize k = String.Length - 1;
+    usize i = 0;
+    while (i < String.Length)
+    {
+      usize Advance = CharUtf8Advance(String.Value[i]);
+      
+      if (Advance)
+      {
+        k -= Advance;
+        MemoryCopy(Out.Value + k, String.Value + i, Advance);
+        i += Advance;
+      } else 
+      {
+        Advance = 1;
+        k -= Advance;
+        Out.Value[k] = String.Value[i];
+        i += Advance;
+      };
+    };
+    Out.Value[Out.Length] = 0;
+  };
+  return Out;
+};
+
+static usize
+StringCapitalize_(string String, u8* Value, usize Length)
+{
+  if (!Value) Length = 0;
+  
+  usize i = 0;
+  usize k = 0;
+  while (i < String.Length)
+  {
+    usize Advance = CharUtf8Advance(String.Value[i]);
+    
+    if (Advance == 0)
+    {
+      i++;
+      continue;
+    };
+    u32 Ch = CharUtf8Decode_(String.Value + i);
+    
+    if (i) Ch = CharToLower(Ch);
+    else Ch = CharToUpper(Ch);
+    
+    usize Width = CharUtf8Length(Ch);
+    
+    if (k + Width <= Length)
+    {
+      CharUtf8Encode_(Ch, Value + k);
+    };
+    k += Width;
+    i += Advance;
+  };
+  return k;
+};
+
+string
+StringCapitalize(string String, arena* Arena)
+{
+  string Out = {0};
+  usize Length = StringCapitalize_(String, 0, 0);
+  
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    StringCapitalize_(String, Out.Value, Length);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+static usize
+StringTitle_(string String, u8* Value, usize Length)
+{
+  if (!Value) Length = 0;
+  
+  usize i = 0;
+  usize k = 0;
+  u32 PrevChar = 0;
+  while (i < String.Length)
+  {
+    usize Advance = CharUtf8Advance(String.Value[i]);
+    
+    if (Advance == 0)
+    {
+      i++;
+      continue;
+    };
+    u32 Ch = CharUtf8Decode_(String.Value + i);
+    
+    if (i && CharIsAlnum(PrevChar)) Ch = CharToLower(Ch);
+    else Ch = CharToUpper(Ch);
+    
+    usize Width = CharUtf8Length(Ch);
+    
+    if (k + Width <= Length)
+    {
+      CharUtf8Encode_(Ch, Value + k);
+    };
+    k += Width;
+    i += Advance;
+    PrevChar = Ch;
+  };
+  return k;
+};
+
+string
+StringTitle(string String, arena* Arena)
+{
+  usize Length = StringTitle_(String, 0, 0);
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    StringTitle_(String, Out.Value, Length);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
