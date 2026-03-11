@@ -529,4 +529,33 @@ StringTitle(string String, arena* Arena);
 string
 StringReverse(string String, arena* Arena);
 
+// String formatting and finding
+
+string
+StringCenter(string String, usize Width, u32 FillChar, arena* Arena);
+
+string
+StringLjust(string String, usize Width, u32 FillChar, arena* Arena);
+
+string
+StringRjust(string String, usize Width, u32 FillChar, arena* Arena);
+
+usize
+StringCount(string String);
+
+usize
+StringCountSub(string String, string Substring);
+
+isize
+StringFind(string String, string Substring);
+
+isize
+StringRfind(string String, string Substring);
+
+isize
+StringIndex(string String, u32 Char);
+
+isize
+StringRindex(string String, u32 Char);
+
 #endif /* BUILTIN_H*/

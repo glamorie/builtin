@@ -1392,3 +1392,180 @@ StringTitle(string String, arena* Arena)
   return Out;
 };
 
+// String formatting and finding
+
+static string
+StringJust(string String, usize Width, u32 FillChar, arena* Arena, u32 Kind)
+{
+  usize FillByteCount = CharUtf8Length(FillChar);
+  if (!FillByteCount) return String;
+  
+  usize CharCount = StringCount(String);
+  
+  if (Width <= CharCount) return String;
+  
+  usize DLeft, DRight;
+  
+  if (Kind == 2)
+  {
+    DLeft = (Width - CharCount) / 2;
+    DRight = Width - DLeft - CharCount;
+  } else if (Kind == 1)
+  {
+    DLeft = Width - CharCount;
+    DRight = 0;
+  } else 
+  {
+    DLeft = 0;
+    DRight = Width - CharCount;
+  };
+  
+  usize Length = (DLeft + DRight) * FillByteCount + String.Length;
+  
+  u8 Parts[4];
+  CharUtf8Decode_(Parts);
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    
+    for (usize i = 0; i < DLeft; i++)
+    {
+      MemoryCopy(Out.Value + i * FillByteCount, Parts, FillByteCount);
+    };
+    
+    usize R = DLeft * FillByteCount + String.Length;
+    
+    for (usize i = 0; i < DRight; i++)
+    {
+      MemoryCopy(Out.Value + (R + i * FillByteCount) , Parts, FillByteCount);
+    };
+    
+    MemoryCopy(Out.Value + DLeft * FillByteCount, String.Value, String.Length);
+    
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringCenter(string String, usize Width, u32 FillChar, arena* Arena)
+{
+  return StringJust(String, Width, FillChar, Arena, 2);
+};
+
+string
+StringLjust(string String, usize Width, u32 FillChar, arena* Arena)
+{
+  return StringJust(String, Width, FillChar, Arena, 0);
+};
+
+string
+StringRjust(string String, usize Width, u32 FillChar, arena* Arena)
+{
+  return StringJust(String, Width, FillChar, Arena, 1);
+};
+
+usize
+StringCount(string String)
+{
+  #if BUILTIN_DISABLE_UNICODE
+  return String.Length;
+  #else 
+  usize Count = 0;
+  usize i = 0;
+  while (i < String.Length)
+  {
+    usize Advance = MaxU(1, CharUtf8Advance(String.Value[i]));
+    if (String.Length < i + Advance) break;
+    i += Advance;
+    Count++;    
+  };
+  return Count;
+  #endif // BUILTIN_DISABLE_UNICODE
+};
+
+usize
+StringCountSub(string String, string Sub)
+{
+  if (!Sub.Length) return StringCount(String) + 1;
+  
+  usize Count = 0;
+  
+  for (usize x = 0; x < String.Length; )
+  {
+    if (String.Length < x + Sub.Length) break;
+    usize y = 0;
+    for (; y < Sub.Length; y++)
+    {
+      if (String.Value[x + y] != Sub.Value[y]) break;
+    };
+    
+    if (y == Sub.Length)
+    {
+      Count++;
+      x += Sub.Length;
+    } else 
+    {
+      x++;
+    };
+  };
+  return Count;
+};
+
+isize
+StringFind(string String, string Sub)
+{
+  if (!Sub.Length) return 0;
+  
+  for (usize x = 0; x; x++)
+  {
+    usize y = 0;
+    for (; y < Sub.Length; x++)
+    {
+      if (String.Value[x + y] != Sub.Value[y]) break;
+    };
+    
+    if (y == Sub.Length) return x;
+  };
+  return -1;
+};
+
+isize
+StringRfind(string String, string Sub)
+{
+  if (!Sub.Length) return String.Length;
+  
+  for (usize x = String.Length; x; x--)
+  {
+    usize y = 0;
+    for (; y < Sub.Length; x++)
+    {
+      if (String.Value[x + y] != Sub.Value[y]) break;
+    };
+    
+    if (y == Sub.Length) return x;
+  };
+  return -1;
+};
+
+isize
+StringIndex(string String, u32 Char)
+{
+  u8 Parts[4];
+  usize Length = CharUtf8Encode_(Char, Parts);
+  string S = {.Value = Parts, .Length = Length};
+  return StringFind(String, S);
+};
+
+isize
+StringRindex(string String, u32 Char)
+{
+  u8 Parts[4];
+  usize Length = CharUtf8Encode_(Char, Parts);
+  string S = {.Value = Parts, .Length = Length};
+  return StringRfind(String, S);
+};
