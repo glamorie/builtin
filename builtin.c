@@ -481,3 +481,186 @@ TempEnd(temp Temp)
 {
   ArenaPopTo(Temp.Arena, Temp.Position);
 };
+
+usize
+CharUtf8Length(u32 c)
+{
+  if (c <= 0x7F) return 1;
+  if (c <= 0x7FF) return 2;
+  if (c <= 0xFFFF)
+  {
+    if (c >= 0xD800 && c <= 0xDFFF) return 0;
+    return 3;
+  };
+  if (c <= 0x10FFFF) return 4;
+  return 0;
+};
+
+usize
+CharUtf8Advance(u8 Start)
+{
+  if ((Start & 0x80) == 0x00) return 1;
+  if ((Start & 0xE0) == 0xC0) return 2;
+  if ((Start & 0xF0) == 0xE0) return 3;
+  if ((Start & 0xF8) == 0xF0) return 4;
+  return 0;
+};
+
+usize
+CharUtf8Encode_(u32 Char, u8* Out)
+{
+  usize Length  = 0;
+  
+  if (Char <= 0x7F)
+  {
+    Out[0] = (u8)Char;
+    Length = 1;
+  } else if (Char <= 0x7FF)
+  {
+    Out[0] = 0xC0 | (Char >> 6);
+    Out[1] = 0x80 | (Char & 0x3F);
+    Length = 2;
+  } else if (Char <= 0xFFFF)
+  {
+    Out[0] = 0xE0 | (Char >> 12);
+    Out[1] = 0x80 | ((Char >> 6) & 0x3F);
+    Out[2] = 0x80 | (Char & 0x3F);
+    Length = 3;
+  } else
+  {
+    Out[0] = 0xF0 | (Char >> 18);
+    Out[1] = 0x80 | ((Char >> 12) & 0x3F);
+    Out[2] = 0x80 | ((Char >> 6) & 0x3F);
+    Out[3] = 0x80 | (Char & 0x3F);
+    Length = 4;
+  };
+  return Length;
+};
+
+void
+CharUtf8Encode(u32 Char, u8* Parts, usize Length)
+{
+  if (CharUtf8Length(Char) == Length && Parts)
+  {
+    CharUtf8Encode_(Char, Parts);
+  };
+};
+
+u32
+CharUtf8Decode_(const u8* Parts)
+{
+  u8 Head = Parts[0];
+  u32 Out = 0;
+  if (Head < 0x80)
+  {
+    Out = Head;
+  } else if ((Head >> 5) == 0x6)
+  {
+    Out = ((u32)(Head & 0x1F) << 6) | ((u32)(Parts[1] & 0x3F));
+  } else if ((Head >> 4) == 0xE)
+  {
+    Out = (
+      ((u32)(Head & 0x0F) << 12) |
+      ((u32)(Parts[1] & 0x3F) << 6) |
+      ((u32)(Parts[2] & 0x3F))
+    );
+  }
+  else
+  {
+    Out = (
+      ((u32)(Head & 0x07) << 18) |
+      ((u32)(Parts[1] & 0x3F) << 12) |
+      ((u32)(Parts[2] & 0x3F) << 6) |
+      ((u32)(Parts[3] & 0x3F))
+    );
+  };
+  return Out;
+};
+
+u32
+CharUtf8Decode(const u8* Parts, usize Length)
+{
+  u32 Out = 0;
+  if (Parts && Length == CharUtf8Advance(*Parts))
+  {
+    Out = CharUtf8Decode_(Parts);
+  };
+  return Out;
+};
+
+usize
+CharUtf16Length(u32 Char)
+{
+  if (Char > 0x10FFFF) return 0;
+  if (Char >= 0xD800 && Char <= 0xDFFF) return 0;
+  if (Char <= 0xFFFF) return 1;
+  return 2;
+};
+
+usize
+CharUtf16Advance(u16 Start)
+{
+  if (Start >= 0xD800 && Start <= 0xDBFF) return 2;
+  if ((Start & 0xFC00) == 0xDC00) return 0;
+  return 1;
+};
+
+usize
+CharUtf16Encode_(u32 Char, u16* Parts)
+{
+  u16 Head = Parts[0];
+  u32 Out = 0;
+  
+  if ((Head & 0xFC00) == 0xD800)
+  {
+    u16 Tail = Parts[1];
+    Out = (
+      (((u32)(Head & 0x03FF) << 10) |
+      ((u32)(Tail & 0x03FF))) + 0x10000
+    );
+  } else
+  {
+    Out = Head;
+  };
+  return Out;
+};
+
+void
+CharUtf16Encode(u32 Char, u16* Parts, usize Length)
+{
+  if (Parts && CharUtf16Advance(*Parts) == Length)
+  {
+    CharUtf16Encode_(Char, Parts);
+  };
+};
+
+u32
+CharUtf16Decode_(const u16* Parts)
+{
+  u16 Head = Parts[0];
+  u32 Out = 0;
+  
+  if ((Head & 0xFC00) == 0xD800)
+  {
+    u16 Tail = Parts[1];
+    Out = (
+      (((u32)(Head & 0x03FF) << 10) |
+      ((u32)(Tail & 0x03FF))) + 0x10000
+    );
+  } else
+  {
+    Out = Head;
+  };
+  return Out;
+};
+
+u32
+CharUtf16Decode(const u16* Parts, usize Length)
+{
+  u32 Out = 0;
+  if (Parts && CharUtf16Advance(*Parts) == Length)
+  {
+    Out = CharUtf16Decode_(Parts);
+  };
+  return Out;
+};

@@ -352,4 +352,41 @@ TempEnd(temp Temp);
 
 #define TempScope(A) for (temp __x = TempBegin(A); !__x.Arena; __x.Arena = 0, (TempEnd(__x)))
 
+// Char
+usize
+CharUtf8Length(u32 Char);
+
+usize
+CharUtf8Advance(u8 Start);
+
+usize
+CharUtf8Encode_(u32 Char, u8* Parts);
+
+void
+CharUtf8Encode(u32 Char, u8* Parts, usize Length);
+
+u32
+CharUtf8Decode_(const u8* Parts);
+
+u32
+CharUtf8Decode(const u8* Parts, usize Length);
+
+usize
+CharUtf16Length(u32 Char);
+
+usize
+CharUtf16Advance(u16 Start);
+
+usize
+CharUtf16Encode_(u32 Char, u16* Parts);
+
+void
+CharUtf16Encode(u32 Char, u16* Parts, usize Length);
+
+u32
+CharUtf16Decode_(const u16* Parts);
+
+u32
+CharUtf16Decode(const u16* Parts, usize Length);
+
 #endif /* BUILTIN_H*/
