@@ -231,4 +231,31 @@ typedef i64 isize;
 
 #define Swap(T, a, b) do { T __t = a; a = b; b = __t; } while (0)
 
+u64
+MinU(u64 a, u64 b);
+
+u64
+MaxU(u64 a, u64 b);
+
+u64
+ClampU(u64 v, u64 a, u64 b);
+
+i64
+MinI(i64 a, i64 b);
+
+i64
+MaxI(i64 a, i64 b);
+
+i64
+ClampI(i64 v, i64 a, i64 b);
+
+float
+MinF(float a, float b);
+
+float
+MaxF(float a, float b);
+
+float
+ClampF(float v, float a, float b);
+
 #endif /* BUILTIN_H*/
