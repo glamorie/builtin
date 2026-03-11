@@ -611,4 +611,25 @@ StringCompareCI(string A, string B);
 u32
 StringEqualCI(string A, string B);
 
+// Number parsing
+typedef struct _flit _flit;
+struct _flit
+{ union { u64 Bits; double Value; }; };
+
+#define FLT_LITERAL(v) ((_flit){.Bits = (v)})
+#if !defined(INFINITY)
+  #define INFINITY FLT_LITERAL(0x7ff0000000000000ULL).Value
+#endif
+
+#if !defined(NAN)
+  #define NAN FLT_LITERAL(0x7ff8000000000000ULL).Value
+#endif 
+
+double
+StringToDouble(string String, u8** End);
+
+isize
+StringToInt(string String, u8** End);
+
+
 #endif /* BUILTIN_H*/
