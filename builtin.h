@@ -558,4 +558,36 @@ StringIndex(string String, u32 Char);
 isize
 StringRindex(string String, u32 Char);
 
+// Split
+string*
+StringSplit(string String, string Sep, usize* Count, u32 Right, arena* Arena);
+
+string*
+StringSplitSpace(string String, usize* Count, arena* Arena);
+
+string*
+StringSplitLines(string String, usize* Count, u32 KeepEnds, arena* Arena);
+
+// Strip
+string
+StringStrip(string String, arena* Arena);
+
+string
+StringLStrip(string String, arena* Arena);
+
+string
+StringRStrip(string String, arena* Arena);
+
+string
+StringReplace(string String, string Substring, string Substitute, arena* Arena);
+
+string
+StringExpandTabs(string String, u32 TabSize, arena* Arena);
+
+string
+StringRemovePrefix(string String, string Prefix, arena* Arena);
+
+string
+StringRemoveSuffix(string String, string Prefix, arena* Arena);
+
 #endif /* BUILTIN_H*/
