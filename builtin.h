@@ -389,4 +389,64 @@ CharUtf16Decode_(const u16* Parts);
 u32
 CharUtf16Decode(const u16* Parts, usize Length);
 
+#if !defined(BUILTIN_CHAR)
+#define BUILTIN_CHAR 1
+#else 
+#define BUILTIN_CHAR 0
+#endif
+
+u32
+CharIsAlpha(u32 Ch);
+
+u32
+CharIsDigit(u32 Ch);
+
+u32
+CharIsAlnum(u32 Ch);
+
+u32
+CharIsCntrl(u32 Ch);
+
+u32
+CharIsPunct(u32 Ch);
+
+u32
+CharIsGraph(u32 Ch);
+
+u32
+CharIsPrint(u32 Ch);
+
+u32
+CharIsLower(u32 Ch);
+
+u32
+CharIsUpper(u32 Ch);
+
+u32
+CharIsXdigit(u32 Ch);
+
+u32
+CharIsBlank(u32 Ch);
+
+u32
+CharIsSpace(u32 Ch);
+
+i32
+CharToDigit(u32 Ch);
+
+u32
+CharToUpper(u32 Ch);
+
+u32
+CharToLower(u32 Ch);
+
+u32
+CharSwapCase(u32 Ch);
+
+u32
+CharCasefold(u32 Ch);
+
+i32
+CharToDigit(u32 Ch);
+
 #endif /* BUILTIN_H*/
