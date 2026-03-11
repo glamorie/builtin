@@ -1,4 +1,5 @@
 #include "builtin.h"
+#include <smmintrin.h>
 #if PLATFORM_WINDOWS
 #include <Windows.h>
 #pragma comment(lib, "onecore.lib")
@@ -830,3 +831,337 @@ CharToDigit(u32 Ch)
 };
 
 #endif // BUILTIN_CHAR
+
+usize
+StringCLen(const char* String)
+{
+  __m128i zero = _mm_setzero_si128();
+  usize i = 0;
+  
+  for (;;) 
+  {
+    __m128i Chunk = _mm_loadu_si128((__m128i*)(String + i));
+    __m128i Comp = _mm_cmpeq_epi8(Chunk, zero);
+    int Mask = _mm_movemask_epi8(Comp);
+    
+    if (Mask != 0) 
+    {
+      usize index;
+      #if COMPILER_MSVC
+      unsigned long t;
+      _BitScanForward(&t, Mask);
+      index = (usize)t;
+      #elif COMPILER_GCC || COMPILER_CLANG
+      index = (usize)__builtin_ctz(Mask);
+      #else
+      index = 0;
+      while (!(Mask & (1 << index))) ++index;
+      #endif
+      
+      return i + index;
+    };
+    i += 16;
+  };
+};
+
+string
+StringCAs(const char* Value)
+{
+  string Out = {(u8*)Value, StringCLen(Value)};
+  return Out;
+};
+
+string
+StringC(const char* Value, arena* Arena)
+{
+  usize Length = StringCLen(Value);
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    MemoryCopy(Out.Value, Value, Length);
+    Out.Length = Length;
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringFv(const char* Format, va_list Args, arena* Arena)
+{
+  va_list Temp;
+  va_copy(Temp, Args);
+  usize Length = vsnprintf(0, 0, Format, Temp);
+  va_end(Temp);
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    vsnprintf((char*)Out.Value, Length + 1, Format, Args);
+    Out.Length = Length;
+  };
+  return Out;
+};
+
+string
+StringF(arena* Arena, const char* Format, ...)
+{
+  va_list Args;
+  va_start(Args, Format);
+  string Out = StringFv(Format, Args, Arena);
+  return Out;
+};
+
+string
+StringClone(string String, arena* Arena)
+{
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, String.Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    MemoryCopy(Out.Value, String.Value, String.Length);
+    Out.Length = String.Length;
+    Out.Value[Out.Length] = 0;
+  };
+  return Out;  
+};
+
+static usize
+StringArgsLength(va_list Args, usize* Count)
+{
+  usize n = 0;
+  usize Length = 0;
+  while (1)
+  {
+    string Value = va_arg(Args, string);
+    if (StringIsSentinel(Value)) break;
+    n++;
+    Length += Value.Length;
+  };
+  if (Count) *Count = n;
+  return Length;
+};
+
+string
+StringJoinFv(arena* Arena, string Sep, va_list Args)
+{
+  usize NumberOfStrings = 0;
+  usize NumberOfBytes = 0;
+  
+  {
+    va_list Copy;
+    va_copy(Copy, Args);
+    NumberOfBytes = StringArgsLength(Copy, &NumberOfStrings);
+    va_end(Copy);
+  };
+  
+  usize Length = NumberOfStrings ? NumberOfBytes + Sep.Length * (NumberOfStrings - 1) : 0;
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  if (Out.Value)
+  {
+    va_list Copy;
+    va_copy(Copy, Args);
+    usize Count = 0;
+    while (1)
+    {
+      string Value = va_arg(Copy, string);
+      
+      if (StringIsSentinel(Value)) break;
+      
+      MemoryCopy(Out.Value + Count, Value.Value, Value.Length);
+      Count += Value.Length;
+      if (Count + Sep.Length < Length)
+      {
+        MemoryCopy(Out.Value + Count, Sep.Value, Sep.Length);
+        Count += Sep.Length;
+      } else break;
+    };
+    va_end(Copy);
+    
+    Out.Length = Length;
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringJoinF_(arena* Arena, string Sep, ...)
+{
+  va_list Args;
+  va_start(Args, Sep);
+  string Out = StringJoinFv(Arena, Sep, Args);
+  va_end(Args);
+  return Out;
+};
+
+string
+StringJoinN(string* Strings, usize Count, string Sep, arena* Arena)
+{
+  usize Length = 0;
+  for (usize i = 0; i < Count; i++)
+  {
+    string Value = Strings[i];
+    Length += Value.Length + Sep.Length;
+  };
+  
+  if (Count) Length -= Sep.Length;
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    usize k = 0;
+    for (usize i = 0; i < Count - 1; i++)
+    {
+      MemoryCopy(Out.Value + k, Strings[i].Value, Strings[i].Length);
+      k += Strings[i].Length;
+      MemoryCopy(Out.Value + k, Sep.Value, Sep.Length);
+      k += Sep.Length;      
+    };
+    MemoryCopy(Out.Value + k, Strings[Count - 1].Value, Strings[Count - 1].Length);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+
+static usize
+StringCArgsLength(va_list Args, usize* Count)
+{
+  usize n = 0;
+  usize Length = 0;
+  while (1)
+  {
+    const char* Value = va_arg(Args, const char*);
+    if (!Value) break;
+    n++;
+    Length += StringCLen(Value);
+  };
+  if (Count) *Count = n;
+  return Length;
+};
+
+string
+StringCJoinFv(string Sep, va_list Args, arena* Arena)
+{
+  va_list Temp;
+  va_copy(Temp, Args);
+  usize Count = 0;
+  usize Length = StringCArgsLength(Temp, &Count);
+  va_end(Temp);
+  
+  if (Count) Length += Sep.Length * (Count - 1);
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    usize k = 0;
+    while (1)
+    {
+      const char* Value = va_arg(Args, const char*);
+      if (!Value) break;
+      
+      
+      for (usize i = 0; Value[i]; i++)
+      {
+        Out.Value[k++] = Value[i];
+      };
+      
+      if (k + Sep.Length < Length)
+      {
+        MemoryCopy(Out.Value + k, Sep.Value, Sep.Length);
+        k += Sep.Length;
+      };
+    };
+    Out.Value[Length] = 0;
+  };
+  return Out;  
+};
+
+string
+StringCJoinF_(arena* Arena, string Sep, ...)
+{
+  va_list Args;
+  va_start(Args, Sep);
+  string Out = StringCJoinFv(Sep, Args, Arena);
+  va_end(Args);
+  return Out;
+};
+
+string
+StringCJoinN(const char** Strings, usize Count, string Sep, arena* Arena)
+{
+  usize Length = 0;
+  for (usize i = 0; i < Count; i++)
+  {
+    const char* Value = Strings[i];
+    Length += StringCLen(Value) + Sep.Length;
+  };
+  if (Count) Length -= Sep.Length;
+  
+  string Out = {0};
+  Out.Value = ArenaPush(Arena, Length + 1, alignof(u8));
+  
+  if (Out.Value)
+  {
+    usize k = 0;
+    Out.Length = Length;
+    
+    for (usize i = 0; i < Count; i++)
+    {
+      const char* Value = Strings[i];
+      usize m = 0;
+      while (Value[m])
+      {
+        Out.Value[k++] = Value[m++];
+      };
+      if (i == Count - 1) continue;
+      MemoryCopy(Out.Value + k, Sep.Value, Sep.Length);
+      k += Sep.Length;
+    };
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+string
+StringRange(string String, usize Start, usize End)
+{
+  usize A = MinU(Start, End), B = MaxU(Start, End);
+  usize x = 0, y = String.Length;
+  usize i = 0;
+  usize k = 0;
+  while (i < String.Length)
+  {
+    usize Advance = MaxU(1, CharUtf8Advance(String.Value[i]));
+    
+    if (i + Advance > String.Length) break;
+    
+    if (A == k) x = i;
+    k++;
+    i += Advance;
+    if (B == k)
+    {
+      y = i;
+      break;
+    };
+  };
+  
+  x = MinU(x, String.Length);
+  y = MinU(y, String.Length);
+  
+  string Out = 
+  {
+    String.Value + x,
+    y - x
+  };
+  return Out;
+};

@@ -449,4 +449,62 @@ CharCasefold(u32 Ch);
 i32
 CharToDigit(u32 Ch);
 
+// string construction
+typedef struct string string;
+struct string
+{
+  u8* Value;
+  usize Length;
+};
+
+#define S(s) ((string){(u8*)(s), sizeof(s)-1})
+
+#define StringSentinel ((string){(u8*)(-1), (usize)(-1)})
+
+u32
+StringIsSentinel(string String);
+
+usize
+StringCLen(const char* String);
+
+string
+StringCAs(const char* Value);
+
+string
+StringC(const char* Value, arena* Arena);
+
+string
+StringFv(const char* Format, va_list Args, arena* Arena);
+
+string
+StringF(arena* Arena, const char* Format, ...);
+
+string
+StringClone(string String, arena* Arena);
+
+string
+StringJoinFv(arena* Arena, string Sep, va_list Args);
+
+string
+StringJoinF_(arena* Arena, string Sep, ...);
+
+#define StringJoinF(Arena, Sep, ...) StringJoinF_(Arena, Sep, __VA_ARGS__, StringSentinel)
+
+string
+StringJoinN(string* Strings, usize Count, string Sep, arena* Arena);
+
+string
+StringCJoinFv(string Sep, va_list Args, arena* Arena);
+
+string
+StringCJoinF_(arena* Arena, string Sep, ...);
+
+#define StringCJoinF(Arena, Sep, ...) StringCJoinF_(Arena, S(Sep), __VA_ARGS__, 0)
+
+string
+StringCJoinN(const char** Strings, usize Count, string Sep, arena* Arena);
+
+string
+StringRange(string String, usize Start, usize End);
+
 #endif /* BUILTIN_H*/
