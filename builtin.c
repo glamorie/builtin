@@ -61,7 +61,7 @@ ClampF(float v, float a, float b)
   return v < a ? a : v < b ? v : b;
 };
 
-inline static usize
+inline internal usize
 MemoryPointerDistance(const void* A, const void* B)
 {
   return A < B ? (usize)B - (usize)A : (usize)A - (usize)B;
@@ -292,13 +292,13 @@ struct arena
 
 #define _ArenaHeader (0x100)
 
-inline static usize
+inline internal usize
 ArenaAlignUp(usize Point, usize Align)
 {
   return Point + (Align - Point % Align) % Align;
 };
 
-inline static usize
+inline internal usize
 ArenaAlignPadding(usize Point, usize Align)
 {
   return (Align - Point % Align) % Align;
@@ -481,6 +481,49 @@ void
 TempEnd(temp Temp)
 {
   ArenaPopTo(Temp.Arena, Temp.Position);
+};
+
+typedef struct arena_scratch arena_scratch;
+struct arena_scratch
+{
+  arena* Arenas[2];
+  usize Init;
+};
+
+threadlocal arena_scratch Scratch = {0};
+const usize ScratchArenaReserve = 1<<30;
+const usize ScratchArenaCommit = 1<<10;
+
+arena*
+ArenaGetScratch(arena** Conflicts, usize Count)
+{
+  if (!Scratch.Init)
+  {
+    Scratch.Init = 1;
+    Scratch.Arenas[0] = ArenaMake(ScratchArenaReserve, ScratchArenaCommit, 0);
+    Scratch.Arenas[1] = ArenaMake(ScratchArenaReserve, ScratchArenaCommit, 0);
+  };
+  arena* Out = 0;
+
+  for (usize i = 0; i < ArrayLen(Scratch.Arenas); i++)
+  {
+    u32 HasConflict = 0;
+    for (usize k = 0; k < Count; k++)
+    {
+      if (Scratch.Arenas[i] == Conflicts[k])
+      {
+        HasConflict = 1;
+        break;
+      };
+    };
+
+    if (!HasConflict)
+    {
+      Out = Scratch.Arenas[i];
+      break;
+    };
+  };
+  return Out;
 };
 
 usize
@@ -683,7 +726,7 @@ enum
   _CharPropertySpace = 1<<12,
 };
 
-static u16 _AsciiPropertyTable[] =
+internal u16 _AsciiPropertyTable[] =
 {
   0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x1810 ,0x1010 ,0x1010 ,0x1010 ,0x1010 ,0x10 ,0x10,
   0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10 ,0x10,
@@ -934,7 +977,7 @@ StringIsSentinel(string String)
   return Sentinel.Length == String.Length && String.Value == Sentinel.Value;
 };
 
-static usize
+internal usize
 StringArgsLength(va_list Args, usize* Count)
 {
   usize n = 0;
@@ -1037,7 +1080,7 @@ StringJoinN(string* Strings, usize Count, string Sep, arena* Arena)
 };
 
 
-static usize
+internal usize
 StringCArgsLength(va_list Args, usize* Count)
 {
   usize n = 0;
@@ -1176,7 +1219,7 @@ StringRange(string String, usize Start, usize End)
 typedef u32
 char_transformer(u32 Ch);
 
-static usize
+internal usize
 StringTransform(string String, u8* Value, usize Length, char_transformer* Transformer)
 {
   if (!Value) Length = 0;
@@ -1299,7 +1342,7 @@ StringReverse(string String, arena* Arena)
   return Out;
 };
 
-static usize
+internal usize
 StringCapitalize_(string String, u8* Value, usize Length)
 {
   if (!Value) Length = 0;
@@ -1348,7 +1391,7 @@ StringCapitalize(string String, arena* Arena)
   return Out;
 };
 
-static usize
+internal usize
 StringTitle_(string String, u8* Value, usize Length)
 {
   if (!Value) Length = 0;
@@ -1401,7 +1444,7 @@ StringTitle(string String, arena* Arena)
 
 // String formatting and finding
 
-static string
+internal string
 StringJust(string String, usize Width, u32 FillChar, arena* Arena, u32 Kind)
 {
   usize FillByteCount = CharUtf8Length(FillChar);
@@ -1665,7 +1708,7 @@ StringSplitSpace(string String, usize* Count, arena* Arena)
   return Out;  
 };
 
-static usize
+internal usize
 StringPeekLine(const u8* Value, usize Length)
 {
   usize Span = 0;
@@ -1737,7 +1780,7 @@ StringSplitLines(string String, usize* Count, u32 KeepEnds, arena* Arena)
   return Out;
 };
 
-static string
+internal string
 StringStrip_(string String, u32 Direction, arena* Arena)
 {
   usize Lpadding = 0;
@@ -1975,7 +2018,7 @@ struct _double_parse_component
   u32 Ok;
 };
 
-static _double_parse 
+internal _double_parse 
 DoubleParseLiteral(string s)
 {
   _double_parse Result = {0};
@@ -2034,7 +2077,7 @@ DoubleParseLiteral(string s)
 };
 
 
-static _double_parse_component 
+internal _double_parse_component 
 DoubleParseComponents(string s)
 {
   _double_parse_component Result = {0};
@@ -2187,10 +2230,10 @@ DoubleParseComponents(string s)
   return Result;
 };
 
-static double
+internal double
 DoubleParsePow10(int e)
 {
-  static const double Powers[] = 
+  internal const double Powers[] = 
   {
     1e1, 1e2, 1e4, 1e8, 1e16, 1e32, 1e64, 1e128, 1e256
   };
@@ -2212,7 +2255,7 @@ DoubleParsePow10(int e)
   return Result;
 };
 
-static _double_parse 
+internal _double_parse 
 DoubleParse(string str)
 {
   _double_parse Result = {0};
@@ -2254,7 +2297,7 @@ struct _int_parse
   u32 Ok;
 };
 
-static _int_parse
+internal _int_parse
 IntParse(string Value)
 {
   _int_parse Result = {0};

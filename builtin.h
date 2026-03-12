@@ -353,7 +353,10 @@ TempBegin(arena* Arena);
 void
 TempEnd(temp Temp);
 
-#define TempScope(A) for (temp __x = TempBegin(A); !__x.Arena; __x.Arena = 0, (TempEnd(__x)))
+#define TempScope(A) for (temp __x = TempBegin(A); __x.Arena; __x.Arena = 0, (TempEnd(__x)))
+
+arena*
+ArenaGetScratch(arena** Conflicts, usize Count);
 
 // Char
 usize
