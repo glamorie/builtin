@@ -927,6 +927,13 @@ StringClone(string String, arena* Arena)
   return Out;  
 };
 
+u32
+StringIsSentinel(string String)
+{
+  string Sentinel = StringSentinel;
+  return Sentinel.Length == String.Length && String.Value == Sentinel.Value;
+};
+
 static usize
 StringArgsLength(va_list Args, usize* Count)
 {
