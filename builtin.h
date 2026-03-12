@@ -173,16 +173,19 @@
   #if COMPILER_MSVC
     #define alignof(t) __alignof(t)
     #define alignas(x) __declspec(align(x))
+    #define threadlocal __declspec(thread)
   #elif COMPILER_CLANG
     #define alignof(t) __alignof(t)
     #define alignas(x) __attribute__((aligned(x)))
+    #define threadlocal __thread
   #elif COMPILER_GCC
     #define alignof(t) __alignof__(t)
     #define alignas(x) __attribute__((aligned(x)))
   #elif
     #define alignof(t) (sizeof(void*))
     #define alignas(x)
-  #endif 
+    #define threadlocal 
+  #endif
 #endif
 
 #if ARCH_ARM32 || ARCH_ARM64 || ARCH_X64 || ARCH_X86
