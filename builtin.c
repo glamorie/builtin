@@ -2231,10 +2231,10 @@ DoubleParse(string str)
 };
 
 double
-StringToFloat(string Str, u8** End)
+StringToDouble(string Str, usize* End)
 {
   _double_parse Result = DoubleParse(Str);
-  if (End) *End = Result.Ok ? 0 : Str.Value + Result.End;
+  if (End) *End = Result.End;
   return Result.Value;
 };
 
@@ -2313,10 +2313,9 @@ IntParse(string Value)
 };
 
 i64
-StringToInt(string Value, u8** End)
+StringToInt(string Value, usize* End)
 {
   _int_parse Parse = IntParse(Value);
-  
-  if (End) *End = Parse.Ok ? 0 : Value.Value + Parse.End;
+  if (End) *End = Parse.End;
   return Parse.Value;
 };

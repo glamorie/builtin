@@ -209,8 +209,8 @@ typedef i32 isize;
 typedef i64 isize;
 #endif
 
-#if !defined(offsetof)
-  #define offsetof(t, m) ((usize)&((t*)0)->m)
+#if !defined(OffsetOf)
+  #define OffsetOf(t, m) ((usize)&((t*)0)->m)
 #endif 
 
 #if !defined(True)
@@ -626,10 +626,9 @@ struct _flit
 #endif 
 
 double
-StringToDouble(string String, u8** End);
+StringToDouble(string String, usize* End);
 
 isize
-StringToInt(string String, u8** End);
-
+StringToInt(string String, usize* End);
 
 #endif /* BUILTIN_H*/
