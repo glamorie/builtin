@@ -602,6 +602,18 @@ StringCompare(string String, string B);
 u32
 StringEqual(string String, string B);
 
+isize
+StringCompareFv(string String, va_list Args);
+
+isize
+StringCompareF_(string String, ...);
+
+u32
+StringEqualF_(string String, ...);
+
+#define StringEqualF(String, ...) (StringEqualF_(String, __VA_ARGS__, StringSentinel) != -1)
+#define StringCompareF(String, ...) StringCompareF_(String, __VA_ARGS__, StringSentinel)
+
 u32
 StringStartsWith(string String, string Prefix);
 
@@ -616,6 +628,18 @@ StringCompareCI(string A, string B);
 
 u32
 StringEqualCI(string A, string B);
+
+isize
+StringCompareCIFv(string String, va_list Args);
+
+isize
+StringCompareCIF_(string String, ...);
+
+u32
+StringEqualCIF_(string String, ...);
+
+#define StringEqualCIF(String, ...) (StringEqualCIF_(String, __VA_ARGS__, StringSentinel) != -1)
+#define StringCompareCIF(String, ...) StringCompareCIF_(String, __VA_ARGS__, StringSentinel)
 
 // Number parsing
 typedef struct _flit _flit;

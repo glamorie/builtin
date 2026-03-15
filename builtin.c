@@ -1955,6 +1955,41 @@ StringEqual(string A, string B)
   return MemoryEqual(A.Value, B.Value, A.Length);
 };
 
+isize
+StringCompareFv(string String, va_list Args)
+{
+  isize i = 0;
+
+  while (1)
+  {
+    string Match = va_arg(Args, string);
+    if (StringIsSentinel(Match)) break;
+    if (StringEqual(String, Match)) return i;
+    i++;
+  };
+  return -1;
+};
+
+isize
+StringCompareF_(string String, ...)
+{
+  va_list Args;
+  va_start(Args, String);
+  isize Out = StringCompareFv(String, Args);
+  va_end(Args);
+  return Out;
+};
+
+u32
+StringEqualF_(string String, ...)
+{
+  va_list Args;
+  va_start(Args, String);
+  isize Out = StringCompareFv(String, Args);
+  va_end(Args);
+  return Out != -1;
+};
+
 u32
 StringStartsWith(string String, string Prefix)
 {
@@ -1995,6 +2030,41 @@ StringEqualCI(string A, string B)
 {
   if (A.Length != B.Length) return 0;
   return StringCompareCI(A, B) == A.Length;
+};
+
+isize
+StringCompareCIFv(string String, va_list Args)
+{
+  isize i = 0;
+
+  while (1)
+  {
+    string Match = va_arg(Args, string);
+    if (StringIsSentinel(Match)) break;
+    if (StringEqualCI(String, Match)) return i;
+    i++;
+  };
+  return -1;
+};
+
+isize
+StringCompareCIF_(string String, ...)
+{
+  va_list Args;
+  va_start(Args, String);
+  isize Out = StringCompareFv(String, Args);
+  va_end(Args);
+  return Out;
+};
+
+u32
+StringEqualCIF_(string String, ...)
+{
+  va_list Args;
+  va_start(Args, String);
+  isize Out = StringCompareFv(String, Args);
+  va_end(Args);
+  return Out != -1;
 };
 
 // Ported from https://github.com/odin-lang/Odin/blob/master/core/strconv/strconv.odin
