@@ -446,7 +446,7 @@ ArenaPopTo(arena* Arena, usize Position)
     Current = Prev;
   };
   
-  Current->Offset = Offset;
+  Current->Position = Offset;
   Arena->Current = Current;
 };
 
