@@ -652,21 +652,18 @@ CharUtf16Advance(u16 Start)
 usize
 CharUtf16Encode_(u32 Char, u16* Parts)
 {
-  u16 Head = Parts[0];
-  u32 Out = 0;
-  
-  if ((Head & 0xFC00) == 0xD800)
+  if (Char > 0x10FFFF) return 0;
+  if (Char >= 0xD800 && Char <= 0xDFFF) return 0;
+  if (Char <= 0xFFFF)
   {
-    u16 Tail = Parts[1];
-    Out = (
-      (((u32)(Head & 0x03FF) << 10) |
-      ((u32)(Tail & 0x03FF))) + 0x10000
-    );
-  } else
-  {
-    Out = Head;
+    Parts[0] = (u16)Char;
+    return 1;
   };
-  return Out;
+
+  Char -= 0x10000;
+  Parts[0] = 0xD800 | (u16)(Char >> 10);
+  Parts[1] = 0xDC00 | (u16)(Char & 0x3FF);
+  return 2;
 };
 
 void
