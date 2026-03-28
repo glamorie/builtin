@@ -394,7 +394,7 @@ ArenaPush(arena* Arena, usize Size, usize Align)
     
     u32 CommitOk = 0;
     if (Current->Flags & ArenaFlagLargePages) CommitOk = PlatformCommitLarge(Current->Base + Current->Position, CommitSize);
-    else CommitOk = PlatformCommitNormal(Current->Base + Current->Position, CommitSize);
+    else CommitOk = PlatformCommitNormal(Current->Base + Current->Commit, CommitSize);
     
     if (!CommitOk) return 0;
     
