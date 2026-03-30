@@ -195,6 +195,47 @@ MemorySwap(void* A, void* B, usize Length)
   };
 };
 
+u64
+MemoryHashSdbm(const u8* Value, usize Length)
+{
+  if (!Value) Length = 0;
+
+  u64 Out = 0;
+  for (usize i = 0; i < Length; i++)
+  {
+    Out = (u64)Value[i] + (Out << 6) + (Out << 16) - Out;
+  };
+  return Out;
+};
+
+u64
+MemoryHashDjb2(const u8* Value, usize Length)
+{
+  if (!Value) Length = 0;
+
+  u64 Out = 0;
+  for (usize i = 0; i < Length; i++)
+  {
+    Out = (usize)Value[i] + ((Out << 5) + Out);
+  };
+  return Out;
+};
+
+usize
+MemoryHashFnv1a(const u8* Value, usize Length)
+{
+  if (!Value) Length = 0;
+  
+  u64 Out = 1469598103934665603ULL;
+  
+  for (usize i = 0; i < Length; i++) 
+  {
+    Out ^= Value[i];
+    Out *= 1099511628211ULL;
+  };
+  return Out;
+};
+
 
 #if PLATFORM_WINDOWS
 usize
@@ -2434,4 +2475,10 @@ StringToInt(string Value, usize* End)
   _int_parse Parse = IntParse(Value);
   if (End) *End = Parse.End;
   return Parse.Value;
+};
+
+usize
+StringHash(string String)
+{
+  return MemoryHashFnv1a(String.Value, String.Length);
 };
