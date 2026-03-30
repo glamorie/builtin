@@ -775,4 +775,54 @@ do  \
 #define DLLPop(List, Result) DLLPopEx(List, Result, Head, Tail, Prev, Next)
 #define DLLMerge(A, B) DLLMergeEx(A, B, Node, Head, Tail, Prev, Next)
 
+#define SLLPushFrontEx(List, Node, Head, Tail, Next) \
+do \
+{ \
+  (Node)->Next = (List)->Head; \
+  if (!(List)->Head) List->Tail = (Node); \
+  (List)->Head = (Node); \
+} while (0)
+
+#define SLLPushEx(List, Node, Head, Tail, Next) \
+do \
+{ \
+  if ((List)->Tail) (List)->Tail->Next = (Node); \
+  else (List)->Head = (Node); \
+  (Node)->Next = (List)->Tail; \
+} while (0)
+
+#define SLLPopFrontEx(List, Result, Head, Tail, Next) \
+do \
+{ \
+  (Result) = (List)->Head; \
+  (List)->Head = (Result)->Next; \
+  if ((Result)) (Result)->Next = NULL; \
+  else (List)->Tail = NULL; \
+} while (0)
+
+#define SLLPopEx(List, Result, Head, Tail, Next) \
+do \
+{ \
+  if ((List)->Head == (List)->Tail) \
+  { \
+    (Result) = (List)->Head; \
+    (List)->Head = NULL; \
+    (List)->Tail = NULL; \
+    if ((Result)) (Result)->Next = NULL; \
+  } else \
+  { \
+    (Result) = (List)->Head; \
+    while ((Result) && (Result)->Next != (List)->Tail) (Result) = (Result)->Next; \
+    (Result)->Next = NULL; \
+    void* _xx = (void*)((List)->Tail); \
+    (List)->Tail = (Result); \
+    (Result) = _xx; \
+  }; \
+} while (0)
+
+#define SLLPushFront(List, Node) SLLPushFrontEx(List, Node, Head, Tail, Next)
+#define SLLPush(List, Node) SLLPushEx(List, Node, Head, Tail, Next)
+#define SLLPopFront(List, Result) SLLPopFrontEx(List, Result, Head, Tail, Next)
+#define SLLPop(List, Result) SLLPopEx(List, Result, Head, Tail, Next)
+
 #endif /* BUILTIN_H*/
