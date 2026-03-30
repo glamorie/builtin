@@ -1941,7 +1941,6 @@ StringRemoveSuffix(string String, string Suffix, arena* Arena)
 usize
 StringCompare(string A, string B)
 {
-  if (A.Length != B.Length) return 0;
   return MemoryCompare(A.Value, B.Value, A.Length);
 };
 
