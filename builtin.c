@@ -1117,6 +1117,11 @@ StringJoinN(string* Strings, usize Count, string Sep, arena* Arena)
   return Out;
 };
 
+string
+StringJoins(strings Strings, string Sep, arena* Arena)
+{
+  return StringJoinN(Strings.Items, Strings.Length, Sep, Arena);
+};
 
 internal usize
 StringCArgsLength(va_list Args, usize* Count)
@@ -1659,7 +1664,7 @@ StringRindex(string String, u32 Char)
 };
 
 string*
-StringSplit(string String, string Sep, usize* Count, u32 Right, arena* Arena)
+StringSplit_(string String, string Sep, usize* Count, u32 Right, arena* Arena)
 {
   string* Out = 0;
   usize ACount = 0;
@@ -1710,8 +1715,16 @@ StringSplit(string String, string Sep, usize* Count, u32 Right, arena* Arena)
   return Out;
 };
 
+strings
+StringSplit(string String, string Sep, u32 Right, arena* Arena)
+{
+  strings Out = {0};
+  Out.Items = StringSplit_(String, Sep, &Out.Length, Right, Arena);
+  return Out;
+};
+
 string*
-StringSplitSpace(string String, usize* Count, arena* Arena)
+StringSplitSpace_(string String, usize* Count, arena* Arena)
 {
   usize ACount = 0;
   
@@ -1746,6 +1759,14 @@ StringSplitSpace(string String, usize* Count, arena* Arena)
   return Out;  
 };
 
+strings
+StringSplitSpace(string String, arena* Arena)
+{
+  strings Out = {0};
+  Out.Items = StringSplitSpace_(String, &Out.Length, Arena);
+  return Out;
+};
+
 internal usize
 StringPeekLine(const u8* Value, usize Length)
 {
@@ -1764,8 +1785,9 @@ StringPeekLine(const u8* Value, usize Length)
   };
   return Span;
 };
+
 string*
-StringSplitLines(string String, usize* Count, u32 KeepEnds, arena* Arena)
+StringSplitLines_(string String, usize* Count, u32 KeepEnds, arena* Arena)
 {
   usize ACount = 0;
   
@@ -1817,6 +1839,15 @@ StringSplitLines(string String, usize* Count, u32 KeepEnds, arena* Arena)
   if (Count) *Count = ACount;
   return Out;
 };
+
+strings
+StringSplitLines(string String, u32 KeepEnds, arena* Arena)
+{
+  strings Out = {0};
+  Out.Items = StringSplitLines_(String, &Out.Length, KeepEnds, Arena);
+  return Out;
+};
+
 
 internal string
 StringStrip_(string String, u32 Direction, arena* Arena)

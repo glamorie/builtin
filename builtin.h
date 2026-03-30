@@ -136,11 +136,11 @@
 
 #if COMPILER_MSVC || (COMPILER_CLANG && PLATFORM_WINDOWS)
   #pragma section(".rodata", read)
-  #define readonly __declspec(allocate(".rodata"))
+  #define readonly __declspec(allocate(".rodata")) const
 #elif COMPILER_CLANG && PLATFORM_LINUX
-  #define readonly __attribute__((section(".rodata")))
+  #define readonly __attribute__((section(".rodata"))) const 
 #else 
-  #define readonly static 
+  #define readonly static const
 #endif 
 
 #if COMPILER_MSVC
@@ -281,6 +281,15 @@ MemoryReverse(void* A, usize Length);
 
 void
 MemorySwap(void* A, void* B, usize Length);
+
+u64
+MemoryHashSdbm(const u8* Value, usize Length);
+
+u64
+MemoryHashDjb2(const u8* Value, usize Length);
+
+usize
+MemoryHashFnv1a(const u8* Value, usize Length);
 
 // Platform memory allocation
 
@@ -467,6 +476,13 @@ struct string
 
 #define StringSentinel ((string){(u8*)(-1), (usize)(-1)})
 
+typedef struct strings strings;
+struct strings
+{
+  string* Items;
+  usize Length;
+};
+
 u32
 StringIsSentinel(string String);
 
@@ -498,6 +514,9 @@ StringJoinF_(arena* Arena, string Sep, ...);
 
 string
 StringJoinN(string* Strings, usize Count, string Sep, arena* Arena);
+
+string
+StringJoins(strings Strings, string Sep, arena* Arena);
 
 string
 StringCJoinFv(string Sep, va_list Args, arena* Arena);
@@ -566,13 +585,22 @@ StringRindex(string String, u32 Char);
 
 // Split
 string*
-StringSplit(string String, string Sep, usize* Count, u32 Right, arena* Arena);
+StringSplit_(string String, string Sep, usize* Count, u32 Right, arena* Arena);
+
+strings
+StringSplit(string String, string Sep, u32 Right, arena* Arena);
 
 string*
-StringSplitSpace(string String, usize* Count, arena* Arena);
+StringSplitSpace_(string String, usize* Count, arena* Arena);
+
+strings
+StringSplitSpace(string String, arena* Arena);
 
 string*
-StringSplitLines(string String, usize* Count, u32 KeepEnds, arena* Arena);
+StringSplitLines_(string String, usize* Count, u32 KeepEnds, arena* Arena);
+
+strings
+StringSplitLines(string String, u32 KeepEnds, arena* Arena);
 
 // Strip
 string
@@ -660,5 +688,8 @@ StringToDouble(string String, usize* End);
 
 isize
 StringToInt(string String, usize* End);
+
+usize
+StringHash(string String);
 
 #endif /* BUILTIN_H*/
