@@ -692,4 +692,87 @@ StringToInt(string String, usize* End);
 usize
 StringHash(string String);
 
+#define DLLPushFrontEx(List, Node, Head, Tail, Prev, Next) \
+do \
+{ \
+  (Node)->Prev = NULL; \
+  (Node)->Next = NULL; \
+  if ((List)->Head) (List)->Head->Prev = (Node); \
+  else (List)->Tail = (Node); \
+  (Node)->Next = (List)->Head; \
+  (List)->Head = (Node); \
+} while (0)
+
+#define DLLPushBackEx(List, Node, Head, Tail, Prev, Next) \
+do \
+{ \
+  (Node)->Prev = NULL; \
+  (Node)->Next = NULL; \
+  if ((List)->Tail) (List)->Tail->Next = (Node); \
+  else (List)->Head = (Node); \
+  (Node)->Prev = (List)->Tail; \
+  (List)->Tail = (Node); \
+} while (0)
+
+#define DLLInsertBeforeEx(List, At, Node, Head, Tail, Prev, Next) \
+do \
+{ \
+  if ((At)->Prev) (At)->Prev->Next = (Node); \
+  else (List)->Head = (Node); \
+  (Node)->Prev = (At)->Prev; \
+  (Node)->Next = (At); \
+} while (0)
+
+#define DLLInsertEx(List, At, Node, Head, Tail, Prev, Next) \
+do  \
+{ \
+  if ((At)->Next) (At)->Next->Next = (Node); \
+  else (List)->Tail = (Node); \
+  (Node)->Prev = (At); \
+  (Node)->Next = (At)->Next; \
+} while(0)
+
+#define DLLRemoveEx(List, Node, Head, Tail, Prev, Next) \
+do \
+{ \
+  if ((Node)->Prev) (Node)->Prev->Next = (Node)->Next; \
+  else (List)->Head = (Node)->Next; \
+  if ((Node)->Next) (Node)->Next->Prev = (Node)->Prev; \
+  else (List)->Tail = (Node)->Prev; \
+  (Node)->Prev = NULL; \
+  (Node)->Next = NULL; \
+} while (0)
+
+#define DLLPopFrontEx(List, Result, Head, Tail, Prev, Next) \
+do \
+{ \
+  (Result) = (List)->Head; \
+  DLLRemoveEx((List), (Result), Head, Tail, Prev, Next); \
+} while (0)
+
+#define DLLPopEx(List, Result, Head, Tail, Prev, Next) \
+do \
+{ \
+  (Result) = (List)->Tail; \
+  DLLRemoveEx(List, (Result), Head, Tail, Prev, Next); \
+} while (0)
+
+#define DLLMergeEx(A, B, Node, Head, Tail, Prev, Next) \
+do  \
+{ \
+  if ((A)->Tail) (A)->Tail->Next = (B)->Head; \
+  else (A)->Head = (B)->Head; \
+  if ((B)->Head) (B)->Head->Prev = (A)->Tail; \
+  (A)->Tail = (B)->Tail; \
+} while (0)
+
+#define DLLPushFront(List, Node) DLLPushFrontEx(List, Node, Head, Tail, Prev, Next)
+#define DLLPushBack(List, Node) DLLPushBackEx(List, Node, Head, Tail, Prev, Next)
+#define DLLInsertBefore(List, At, Node) DLLInsertBeforeEx(List, At, Node, Head, Tail, Prev, Next)
+#define DLLInsert(List, At, Node) DLLInsertEx(List, At, Node, Head, Tail, Prev, Next)
+#define DLLRemove(List, Node) DLLRemoveEx(List, Node, Head, Tail, Prev, Next)
+#define DLLPopFront(List, Result) DLLPopFrontEx(List, Result, Head, Tail, Prev, Next)
+#define DLLPop(List, Result) DLLPopEx(List, Result, Head, Tail, Prev, Next)
+#define DLLMerge(A, B) DLLMergeEx(A, B, Node, Head, Tail, Prev, Next)
+
 #endif /* BUILTIN_H*/
