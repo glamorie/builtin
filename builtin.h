@@ -234,32 +234,59 @@ typedef i64 isize;
 
 #define Swap(T, a, b) do { T __t = a; a = b; b = __t; } while (0)
 
-u64
-MinU(u64 a, u64 b);
+inline i64
+MinI(i64 a, i64 b)
+{
+  return a < b ? a : b;
+};
 
-u64
-MaxU(u64 a, u64 b);
+inline i64
+MaxI(i64 a, i64 b)
+{
+  return a > b ? a : b;
+};
 
-u64
-ClampU(u64 v, u64 a, u64 b);
+inline i64
+ClampI(i64 a, i64 x, i64 y)
+{
+  return a < x ? x : a < y ? a : y;
+};
 
-i64
-MinI(i64 a, i64 b);
+inline u64
+MinU(u64 a, u64 b)
+{
+  return a < b ? a : b;
+};
 
-i64
-MaxI(i64 a, i64 b);
+inline u64
+MaxU(u64 a, u64 b)
+{
+  return a > b ? a : b;
+};
 
-i64
-ClampI(i64 v, i64 a, i64 b);
+inline u64
+ClampU(u64 a, u64 x, u64 y)
+{
+  return a < x ? x : a < y ? a : y;
+};
 
-float
-MinF(float a, float b);
+inline double
+MinF(double a, double b)
+{
+  return a < b ? a : b;
+};
 
-float
-MaxF(float a, float b);
+inline double
+MaxF(double a, double b)
+{
+  return a > b ? a : b;
+};
 
-float
-ClampF(float v, float a, float b);
+inline double
+ClampF(double a, double x, double y)
+{
+  return a < x ? x : a < y ? a : y;
+};
 
 void*
 MemoryCopy(void* Dest, const void* Src, usize Length);
