@@ -598,6 +598,9 @@ StringCount(string String);
 usize
 StringCountSub(string String, string Substring);
 
+usize
+StringCountUtf16(string String);
+
 isize
 StringFind(string String, string Substring);
 
@@ -650,6 +653,9 @@ StringRemovePrefix(string String, string Prefix, arena* Arena);
 
 string
 StringRemoveSuffix(string String, string Prefix, arena* Arena);
+
+u16*
+StringEncodeUtf16(string String, usize* Length, arena* Arena);
 
 usize
 StringCompare(string String, string B);

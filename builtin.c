@@ -1555,6 +1555,27 @@ StringCountSub(string String, string Sub)
   return Count;
 };
 
+usize
+StringCountUtf16(string String)
+{
+  usize Count = 0;
+  for (usize i = 0; i < String.Length;)
+  {
+    usize Advance = CharUtf8Advance(String.Value[i]);
+    if (Advance && Advance < String.Length)
+    {
+      u32 Char = CharUtf8Decode_(String.Value + i);
+      Count += CharUtf16Length(Char);
+    } else // Write as normal result
+    {
+      Advance = 1;
+      Count++;
+    };
+    i += Advance;
+  };
+  return Count;
+};
+
 isize
 StringFind(string String, string Sub)
 {
@@ -1954,6 +1975,39 @@ StringRemoveSuffix(string String, string Suffix, arena* Arena)
   
   string Slice = {String.Value, String.Length - Suffix.Length};
   return StringClone(Slice, Arena);
+};
+
+u16*
+StringEncodeUtf16(string String, usize* Length, arena* Arena)
+{
+  usize OutLen = 0;
+  usize Count = StringCountUtf16(String);
+  u16* Out = ArenaPushN(Arena, sizeof(u16), Count + 1, alignof(u16));
+  
+  if (Out)
+  {
+    OutLen = Count;
+    usize x = 0;
+    for (usize i = 0; i < String.Length;)
+    {
+      usize Advance = CharUtf8Advance(String.Value[i]);
+      if (Advance && Advance < String.Length)
+      {
+        u32 Char = CharUtf8Decode_(String.Value + i);
+        x += CharUtf16Encode_(Char, Out + x);
+
+      } else // Error response: write as normal characters
+      {
+        Advance = 1;
+        Out[x++] = String.Value[i];
+      };
+      i += Advance;
+    };
+    Out[OutLen] = 0;
+  };
+
+  if (Length) *Length = OutLen;
+  return Out;
 };
 
 usize
