@@ -891,6 +891,37 @@ StringCLen(const char* String)
   };
 };
 
+usize
+StringWLen(const u16* Value)
+{
+
+  __m128i zero = _mm_setzero_si128();
+  usize i = 0;
+  
+  for (;;)
+  {
+    __m128i chunk = _mm_loadu_si128((__m128i*)(Value + i));
+    __m128i comp  = _mm_cmpeq_epi16(chunk, zero); 
+    int mask      = _mm_movemask_epi8(comp);
+    
+    if (mask != 0)
+    {
+      unsigned long t;
+#if COMPILER_MSVC
+      _BitScanForward(&t, mask);
+      usize byteIndex = (usize)t;
+#elif COMPILER_GCC || COMPILER_CLANG
+      usize byteIndex = (usize)__builtin_ctz(mask);
+#else
+      usize byteIndex = 0;
+      while (!(mask & (1 << byteIndex))) ++byteIndex;
+#endif
+      return i + (byteIndex >> 1);
+    };
+    i += 8;
+  };
+};
+
 string
 StringCAs(const char* Value)
 {
@@ -1562,11 +1593,33 @@ StringCountUtf16(string String)
   for (usize i = 0; i < String.Length;)
   {
     usize Advance = CharUtf8Advance(String.Value[i]);
-    if (Advance && Advance < String.Length)
+    if (Advance && i + Advance <= String.Length)
     {
       u32 Char = CharUtf8Decode_(String.Value + i);
       Count += CharUtf16Length(Char);
     } else // Write as normal result
+    {
+      Advance = 1;
+      Count++;
+    };
+    i += Advance;
+  };
+  return Count;
+};
+
+usize
+StringwCountUtf8(stringw String)
+{
+  usize Count = 0;
+  for (usize i = 0; i < String.Length; )
+  {
+    usize Advance = CharUtf16Advance(String.Value[i]);
+
+    if (Advance && i + Advance <= String.Length)
+    {
+      u32 Char = CharUtf16Decode_(String.Value + i);
+      Count += CharUtf8Length(Char);
+    } else
     {
       Advance = 1;
       Count++;
@@ -1991,7 +2044,7 @@ StringEncodeUtf16(string String, usize* Length, arena* Arena)
     for (usize i = 0; i < String.Length;)
     {
       usize Advance = CharUtf8Advance(String.Value[i]);
-      if (Advance && Advance < String.Length)
+      if (Advance && i + Advance <= String.Length)
       {
         u32 Char = CharUtf8Decode_(String.Value + i);
         x += CharUtf16Encode_(Char, Out + x);
@@ -2506,6 +2559,47 @@ StringToInt(string Value, usize* End)
   _int_parse Parse = IntParse(Value);
   if (End) *End = Parse.End;
   return Parse.Value;
+};
+
+u8*
+StringwEncodeUtf8(stringw String, usize* Length, arena* Arena)
+{
+  usize OutLen = 0;
+  usize Count = StringwCountUtf8(String);
+  u8* Out = ArenaPushN(Arena, sizeof(u8), Count + 1, alignof(u8));
+  usize x = 0;
+  for (usize i = 0; i < String.Length; i++)
+  {
+    usize Advance = CharUtf16Advance(String.Value[i]);
+
+    if (Advance && i + Advance <= String.Length)
+    {
+      u32 Char = CharUtf16Decode_(String.Value + i);
+      x += CharUtf8Encode_(Char, Out + x);      
+    } else
+    {
+      Advance = 1;
+      Out[x++] = String.Value[i] & 0xFF; // Maybe write '?'
+    };
+  };
+  if (Length) *Length = OutLen;
+  return Out;
+};
+
+string
+StringFromW(stringw String, arena* Arena)
+{
+  string Out = {0};
+  Out.Value = StringwEncodeUtf8(String, &Out.Length, Arena);
+  return Out;
+};
+
+stringw
+StringToW(string String, arena* Arena)
+{
+  stringw Out = {0};
+  Out.Value = StringEncodeUtf16(String, &String.Length, Arena);
+  return Out;
 };
 
 usize

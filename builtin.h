@@ -501,6 +501,14 @@ struct string
 
 #define S(s) ((string){(u8*)(s), sizeof(s)-1})
 
+typedef struct stringw stringw;
+struct stringw
+{
+  u16* Value;
+  usize Length;
+};
+
+#define Sw(s) ((string){(u16*)(L#s), sizeof(s)-1})
 #define StringSentinel ((string){(u8*)(-1), (usize)(-1)})
 
 typedef struct strings strings;
@@ -515,6 +523,9 @@ StringIsSentinel(string String);
 
 usize
 StringCLen(const char* String);
+
+usize
+StringWLen(const u16* Value);
 
 string
 StringCAs(const char* Value);
@@ -721,6 +732,15 @@ StringToDouble(string String, usize* End);
 
 isize
 StringToInt(string String, usize* End);
+
+string
+StringFromW(stringw String, arena* Arena);
+
+stringw
+StringToW(string Strring, arena* Arena);
+
+u8*
+StringwEncodeUtf8(stringw String, usize* Length, arena* Arena);
 
 usize
 StringHash(string String);
