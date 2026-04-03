@@ -745,6 +745,38 @@ StringwEncodeUtf8(stringw String, usize* Length, arena* Arena);
 usize
 StringHash(string String);
 
+typedef struct strings_list_node strings_list_node;
+struct strings_list_node
+{
+  strings_list_node* Next;
+  string* Value;
+};
+
+typedef struct strings_list strings_list;
+struct strings_list
+{
+  temp Temp;
+  strings_list_node* Head;
+  strings_list_node* Tail;
+  usize Granularity;
+  usize Length;
+  usize Capacity;
+  u32 NoResize;
+};
+
+strings_list
+StringsListBegin(arena* Arena, usize Granularity);
+
+u32
+StringsListEnsure(strings_list* List);
+
+u32
+StringsListPush(strings_list* List, string Value);
+
+strings
+StringsListEnd(strings_list* List, arena* Arena);
+
+
 #define DLLPushFrontEx(List, Node, Head, Tail, Prev, Next) \
 do \
 { \
@@ -877,5 +909,152 @@ do \
 #define SLLPush(List, Node) SLLPushEx(List, Node, Head, Tail, Next)
 #define SLLPopFront(List, Result) SLLPopFrontEx(List, Result, Head, Tail, Next)
 #define SLLPop(List, Result) SLLPopEx(List, Result, Head, Tail, Next)
+
+// File system layer
+enum path_error_
+{
+  PathErrorNone = 0,
+  PathErrorAllocationFailed,
+  // Path file type error
+  PathErrorFileNotFound,
+  PathErrorPathNotFound,
+  PathErrorInvalidName,
+  PathErrorBadPathName,
+  PathErrorNameTooLong,
+  PathErrorNotADirectory,
+  PathErrorIsDirectory,
+  PathErrorFileReadOnly,
+  PathErrorFileLocked,
+
+  // Permissiion errors
+  PathErrorAccessDenied,
+  PathErrorSharingViolation,
+  PathErrorLockViolation,
+  PathErrorPrivilegeNotHeld,
+  PathErrorWriteProtected,
+
+  // Conflics with existancee
+  PathErrorFileExists,
+  PathErrorAlreadyExists,
+  PathErrorCannotCreate,
+  PathErrorInvalidHandle,
+
+  // IO Errors
+  PathErrorReadFault,
+  PathErrorWriteFault,
+  PathErrorCrcError,
+  PathErrorIoDeviceError,
+  PathErrorDeviceNotConnected,
+  PathErrorDeviceBusy,
+
+  // Storage limits
+  PathErrorDiskFull,
+  PathErrorHandleDiskFull,
+  PathErrorTooManyOpenFiles,
+
+  // Directory / filesystem structure
+  PathErrorDirectoryNotEmpty,
+  PathErrorAlreadyAssigned,
+  PathErrorBadNetworkPath,
+
+  // Links
+  PathErrorCannotResolve,
+  PathErrorReparsePointNotResolved,
+  PathErrorSymlinkNotSupported,
+
+  // Catch-all
+  PathErrorUnknown
+};
+
+typedef u32 path_error;
+
+string
+PathGetWorkingDirectory(arena* Arena);
+
+string
+PathGetExecutablePath(arena* Arena);
+
+string
+PathGetExecutableFolder(arena* Arena);
+
+string
+PathSep(void);
+
+string
+PathJoinFv(arena* Arena, va_list Args);
+
+string
+PathJoinF_(arena* Arena, ...);
+
+#define PathJoinF(Arena, ...) PathJoinF_(Arena, __VA_ARGS__, StringSentinel)
+
+string
+PathNormalize(string Path, arena* Arena);
+
+string
+PathGetExtensionSlice(string Path);
+
+string
+PathGetExtension(string Path, arena* Arena);
+
+string
+PathGetFilenameSlice(string Path);
+
+string
+PathGetFilename(string Path, arena* Arena);
+
+string
+PathGetParent(string Path, arena* Arena);
+
+string
+PathGetParentSlice(string Path);
+
+string
+PathGetStem(string Path, arena* Arena);
+
+string
+PathGetStemSlice(string Path);
+
+u32
+PathExists(string Path);
+
+u32
+PathIsFolder(string Path);
+
+u32
+PathIsFile(string Path);
+
+string
+PathReadAll(string Path, path_error* Error, arena* Arena);
+
+u32
+PathWriteAll(string Path, const void* Data, usize Length, arena* Arena, path_error* Error);
+
+u32
+PathDeleteFile(string Path, path_error* Error);
+
+u32
+PathCopyFile(string SrcPath, string DestPath, u32 Overwrite, path_error* Error);
+
+u32
+PathMoveFile(string Source, string Dest, u32 Replace, path_error* Error); 
+
+u32
+PathCreateFolder(string Path, u32 ExistOk, path_error* Error);
+
+u32
+PathDeleteFolder(string Path, u32 Recursive, path_error* Error);
+
+u32
+PathCopyFolder(string SrcPath, string DestPath, u32 Overwrite, u32 Recursive, path_error* Error);
+
+u32
+PathMoveFolder(string Src, string Dest, u32 Replace, path_error* Error);
+
+string*
+PathListDir(string Path, usize* Count, arena* Arena, path_error* Error);
+
+strings
+PathListDirs(string Path, arena* Arena, path_error* Error);
 
 #endif /* BUILTIN_H*/

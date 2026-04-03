@@ -145,7 +145,7 @@ u64
 MemoryHashSdbm(const u8* Value, usize Length)
 {
   if (!Value) Length = 0;
-
+  
   u64 Out = 0;
   for (usize i = 0; i < Length; i++)
   {
@@ -158,7 +158,7 @@ u64
 MemoryHashDjb2(const u8* Value, usize Length)
 {
   if (!Value) Length = 0;
-
+  
   u64 Out = 0;
   for (usize i = 0; i < Length; i++)
   {
@@ -491,7 +491,7 @@ ArenaGetScratch(arena** Conflicts, usize Count)
     Scratch.Arenas[1] = ArenaMake(ScratchArenaReserve, ScratchArenaCommit, 0);
   };
   arena* Out = 0;
-
+  
   for (usize i = 0; i < ArrayLen(Scratch.Arenas); i++)
   {
     u32 HasConflict = 0;
@@ -503,7 +503,7 @@ ArenaGetScratch(arena** Conflicts, usize Count)
         break;
       };
     };
-
+    
     if (!HasConflict)
     {
       Out = Scratch.Arenas[i];
@@ -646,7 +646,7 @@ CharUtf16Encode_(u32 Char, u16* Parts)
     Parts[0] = (u16)Char;
     return 1;
   };
-
+  
   Char -= 0x10000;
   Parts[0] = 0xD800 | (u16)(Char >> 10);
   Parts[1] = 0xDC00 | (u16)(Char & 0x3FF);
@@ -894,7 +894,7 @@ StringCLen(const char* String)
 usize
 StringWLen(const u16* Value)
 {
-
+  
   __m128i zero = _mm_setzero_si128();
   usize i = 0;
   
@@ -907,15 +907,15 @@ StringWLen(const u16* Value)
     if (mask != 0)
     {
       unsigned long t;
-#if COMPILER_MSVC
+      #if COMPILER_MSVC
       _BitScanForward(&t, mask);
       usize byteIndex = (usize)t;
-#elif COMPILER_GCC || COMPILER_CLANG
+      #elif COMPILER_GCC || COMPILER_CLANG
       usize byteIndex = (usize)__builtin_ctz(mask);
-#else
+      #else
       usize byteIndex = 0;
       while (!(mask & (1 << byteIndex))) ++byteIndex;
-#endif
+      #endif
       return i + (byteIndex >> 1);
     };
     i += 8;
@@ -1614,7 +1614,7 @@ StringwCountUtf8(stringw String)
   for (usize i = 0; i < String.Length; )
   {
     usize Advance = CharUtf16Advance(String.Value[i]);
-
+    
     if (Advance && i + Advance <= String.Length)
     {
       u32 Char = CharUtf16Decode_(String.Value + i);
@@ -2048,7 +2048,7 @@ StringEncodeUtf16(string String, usize* Length, arena* Arena)
       {
         u32 Char = CharUtf8Decode_(String.Value + i);
         x += CharUtf16Encode_(Char, Out + x);
-
+        
       } else // Error response: write as normal characters
       {
         Advance = 1;
@@ -2058,7 +2058,7 @@ StringEncodeUtf16(string String, usize* Length, arena* Arena)
     };
     Out[OutLen] = 0;
   };
-
+  
   if (Length) *Length = OutLen;
   return Out;
 };
@@ -2080,7 +2080,7 @@ isize
 StringCompareFv(string String, va_list Args)
 {
   isize i = 0;
-
+  
   while (1)
   {
     string Match = va_arg(Args, string);
@@ -2157,7 +2157,7 @@ isize
 StringCompareCIFv(string String, va_list Args)
 {
   isize i = 0;
-
+  
   while (1)
   {
     string Match = va_arg(Args, string);
@@ -2571,7 +2571,7 @@ StringwEncodeUtf8(stringw String, usize* Length, arena* Arena)
   for (usize i = 0; i < String.Length; i++)
   {
     usize Advance = CharUtf16Advance(String.Value[i]);
-
+    
     if (Advance && i + Advance <= String.Length)
     {
       u32 Char = CharUtf16Decode_(String.Value + i);
@@ -2607,3 +2607,858 @@ StringHash(string String)
 {
   return MemoryHashFnv1a(String.Value, String.Length);
 };
+
+strings_list
+StringsListBegin(arena* Arena, usize Granularity)
+{
+  strings_list Out = {0};
+  Out.Temp = TempBegin(Arena);
+  Out.Granularity = Granularity;
+  return Out;
+};
+
+u32
+StringsListEnsure(strings_list* List)
+{
+  if (!List || List->Capacity >  List->Length  || List->NoResize) return List && !List->NoResize;
+
+  strings_list_node* Node = ArenaZPush(List->Temp.Arena, sizeof(*Node), alignof(strings_list_node));
+
+  if (Node)
+  {
+    Node->Value = ArenaPushN(List->Temp.Arena, sizeof(string), List->Granularity, alignof(string));
+
+    if (Node->Value)
+    {
+      SLLPush(List, Node);
+      List->Capacity += List->Granularity;
+      return 1;
+    };
+  };
+
+  List->NoResize = 1;
+  return 0;
+};
+
+u32
+StringsListPush(strings_list* List, string Value)
+{
+  if (StringsListEnsure(List))
+  {
+    List->Tail->Value[List->Length % List->Granularity] = Value;
+    List->Length++;
+    return 1;
+  };
+  return 0;
+};
+
+strings
+StringsListEnd(strings_list* List, arena* Arena)
+{
+  strings Out = {0};
+  if (List)
+  {
+    Out.Items = ArenaPushN(Arena, sizeof(string), List->Length, alignof(string));
+
+    if (Out.Items)
+    {
+      usize x = 0;
+      for (strings_list_node* Node = List->Head; Node; Node = Node->Next)
+      {
+        usize ToCopy = MinU(List->Length - x, List->Granularity);
+        MemoryCopy(Out.Items + x, Node->Value, sizeof(string) * ToCopy);
+        x += ToCopy;
+      };
+      Out.Length = x;
+    };
+  };
+  return Out;
+};
+
+stringw
+StringwFv(arena* Arena, const u16* Format, va_list Args) // Will be removed 
+{
+  va_list Copy;
+  va_copy(Copy, Args);
+  usize Length = _vsnwprintf(0, 0, Format, Args);
+  va_end(Copy);
+  stringw Out = {0};
+  Out.Value = ArenaPushN(Arena, sizeof(u16), Length + 1, alignof(u16));
+  
+  if (Out.Value)
+  {
+    Out.Length = Length;
+    _vsnwprintf(Out.Value, Length + 1, Format, Args);
+    Out.Value[Length] = 0;
+  };
+  return Out;
+};
+
+stringw
+StringwF(arena* Arena, const u16* Format, ...)
+{
+  va_list Args;
+  va_start(Args, Format);
+  stringw Out = StringwFv(Arena, Format, Args);
+  va_end(Args);
+  return Out;
+};
+
+u32
+StringwEqualC(const u16* A, const u16* B)
+{
+  if (A && B)
+  {
+    usize i = 0;
+    while (A[i] && A[i] == B[i]) i++;
+    return A[i] == B[i];
+  }
+  return A == B;
+};
+// Path layer
+
+string
+PathSep(void)
+{
+#if PLATFORM_WINDOWS
+  return S("\\");
+#else 
+  return S("/");
+#endif
+};
+
+
+static inline u32
+PathCharIsSep(u32 Char)
+{
+  return (Char == '\\') + (Char == '/');
+};
+
+string 
+PathGetFilenameSlice(string Path)
+{
+  string Out = {0};
+  usize Start = 0;
+  for (usize i = Path.Length; i; i--)
+  {
+    if (Path.Value[i - 1] == '\\')
+    {
+      Start = i;
+      break;
+    };
+  };  
+  Out.Value  = Path.Value + Start;
+  Out.Length = Path.Length - Start;
+  return Out;
+};
+
+string
+PathGetExtensionSlice(string Path)
+{
+  string Out = {0};
+  
+  for (usize i = Path.Length; i; i--)
+  {
+    if (PathCharIsSep(Path.Value[i - 1])) break;
+    if (Path.Value[i - 1] == '.')
+    {
+      if (i > 1 && Path.Value[i - 2] != '\\')
+      {
+        Out.Value = Path.Value + i;
+        Out.Length = Path.Length - i;
+      };
+      break;
+    };
+  };
+  return Out;
+};
+
+string
+PathGetStemSlice(string Path)
+{
+  string Out = PathGetFilenameSlice(Path);
+  
+  for (usize i = Out.Length; i; i--)
+  {
+    if (Path.Value[i - 1] == '.')
+    {
+      if (i > 1)
+      {
+        Out.Length = i;
+        break;
+      };
+    }
+  };
+  return Out;
+};
+
+string
+PathGetParentSlice(string Path)
+{
+  string Out = {0};
+  usize i = 0;
+  
+  while (i && PathCharIsSep(Path.Value[i - 1])) i--;
+  
+  for (; i; i--)
+  {
+    if (PathCharIsSep(Path.Value[i - 1]))
+    {
+      Out.Value = Path.Value;
+      Out.Length = i - 1;
+    };
+  };  
+  return Out;
+};
+
+string
+PathGetExtension(string Path, arena* Arena)
+{
+  return StringClone(PathGetExtensionSlice(Path), Arena);
+};
+
+string
+PathGetFilename(string Path, arena* Arena)
+{
+  return StringClone(PathGetFilenameSlice(Path), Arena);
+};
+
+string
+PathGetParent(string Path, arena* Arena)
+{
+  return StringClone(PathGetParentSlice(Path), Arena);
+};
+
+string
+PathGetStem(string Path, arena* Arena)
+{
+  return StringClone(PathGetStemSlice(Path), Arena);
+};
+
+string
+PathJoinFv(arena* Arena, va_list Args)
+{
+  return StringJoinFv(Arena, PathSep(), Args);
+};
+
+string
+PathJoinF_(arena* Arena, ...)
+{
+  va_list Args;
+  va_start(Args, Arena);
+  string Out = PathJoinFv(Arena, Args);
+  va_end(Args);
+  return Out;
+};
+
+#if PLATFORM_WINDOWS
+#include <Psapi.h>
+#include <pathcch.h>
+
+threadlocal u16* LongPathBuffer = 0;;
+
+string
+PathGetWorkingDirectory(arena* Arena)
+{
+  u16 MaxPath[MAX_PATH];
+  stringw PathBuffer;
+  PathBuffer.Value = MaxPath;
+  PathBuffer.Length = GetCurrentDirectoryW(MAX_PATH, MaxPath);
+  
+  string Out = StringFromW(PathBuffer, Arena);
+  return Out;
+};
+
+string
+PathGetExecutablePath(arena* Arena)
+{
+  u16 MaxPath[MAX_PATH];
+  stringw PathBuffer;
+  PathBuffer.Value = MaxPath;
+  PathBuffer.Length = GetModuleFileNameW(NULL, MaxPath, MAX_PATH);
+  string Out = StringFromW(PathBuffer, Arena);
+  return Out;
+};
+
+string
+PathGetExecutableFolder(arena* Arena)
+{
+  u16 MaxPath[MAX_PATH];
+  stringw PathBuffer;
+  PathBuffer.Value = MaxPath;
+  PathBuffer.Length = GetModuleFileNameW(NULL, MaxPath, MAX_PATH);
+  
+  for (usize i = PathBuffer.Length; i; i--)
+  {
+    if (PathBuffer.Value[i - 1] == '\\')
+    {
+      PathBuffer.Length = i - 1;
+      break;
+    };
+  };
+  string Out = StringFromW(PathBuffer, Arena);  
+  return Out;
+};
+
+string
+PathNormalize(string Path, arena* Arena)
+{
+  string Out = {0};
+  temp Temp = TempBegin(ArenaGetScratch(&Arena, 1));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  usize Length = GetFullPathNameW(Pathw.Value, 0, 0, 0);
+  u16* Buffer = ArenaPushN(Temp.Arena, sizeof(u16), Length, alignof(u16));
+  if (Buffer)
+  {
+    stringw Bufferw = {Buffer, Length};
+    GetFullPathNameW(Pathw.Value, Bufferw.Length, Bufferw.Value, 0);
+    Out = StringFromW(Bufferw, Arena);
+  };
+  TempEnd(Temp);
+  return Out;
+};
+
+u32
+PathExists(string Path)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  DWORD FileAttr = GetFileAttributesW(Pathw.Value);
+  TempEnd(Temp);
+  return FileAttr != INVALID_FILE_ATTRIBUTES;
+};
+
+u32
+PathIsFolder(string Path)
+{  
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  DWORD FileAttr = GetFileAttributesW(Pathw.Value);
+  TempEnd(Temp);
+  return FileAttr != INVALID_FILE_ATTRIBUTES && (FileAttr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+};
+
+u32
+PathIsFile(string Path)
+{
+  return !PathIsFolder(Path);
+};
+
+static inline path_error 
+PathErrorFromWin32(DWORD LastError)
+{
+  switch (LastError)
+  {
+    case 0: return PathErrorNone;
+    case ERROR_FILE_NOT_FOUND: return PathErrorFileNotFound;
+    case ERROR_PATH_NOT_FOUND: return PathErrorPathNotFound;
+    case ERROR_TOO_MANY_OPEN_FILES: return PathErrorTooManyOpenFiles;
+    case ERROR_ACCESS_DENIED: return PathErrorAccessDenied;
+    case ERROR_WRITE_PROTECT: return PathErrorFileReadOnly;
+    case ERROR_SHARING_VIOLATION: return PathErrorSharingViolation;
+    case ERROR_LOCK_VIOLATION: return PathErrorFileLocked;
+    case ERROR_DISK_FULL: return PathErrorDiskFull;
+    case ERROR_DIR_NOT_EMPTY: return PathErrorDirectoryNotEmpty;
+    case ERROR_ALREADY_EXISTS: return PathErrorAlreadyExists;
+    case ERROR_FILENAME_EXCED_RANGE: return PathErrorNameTooLong;
+    case ERROR_INVALID_NAME: return PathErrorInvalidName;
+    default: return PathErrorUnknown;
+  };
+};
+
+string
+PathReadAll(string Path, path_error* Error, arena* Arena)
+{
+  path_error Err = PathErrorNone;
+  HANDLE HFile = 0;
+  string Out = {0};
+  TempScope(Arena)
+  {
+    stringw Pathw = StringToW(Path, Arena);
+    HFile = CreateFileW(
+      Pathw.Value, GENERIC_READ, FILE_SHARE_READ, NULL,
+      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL
+    );
+  };
+  
+  if (HFile != INVALID_HANDLE_VALUE)
+  {
+    usize FileSize = 0;
+    LARGE_INTEGER FileSizeL = {0};
+    
+    if (GetFileSizeEx(HFile, &FileSizeL) != 0)
+    {
+      FileSize = FileSizeL.QuadPart;
+    };
+    
+    Out.Value = ArenaPushN(Arena, sizeof(u8), FileSize + 1, alignof(u8));
+    
+    if (Out.Value)
+    {
+      usize i = 0;
+      while (i < FileSize)
+      {
+        DWORD ToRead = MinU((~((DWORD)0)) - 1, FileSize - i);
+        DWORD Read = 0;
+        if (!ReadFile(HFile, Out.Value + i, ToRead, &Read, NULL)) break;
+        if (!Read) break;
+        i += Read;
+      };
+      
+      if (i != FileSize)
+      {
+        Err = PathErrorFromWin32(GetLastError());
+        ArenaPop(Arena, FileSize + 1);
+        Out.Value = 0;
+      } else
+      {
+        Out.Value[FileSize] = 0;
+        Out.Length = FileSize;
+      };
+      
+    } else
+    {
+      Err = PathErrorAllocationFailed;
+    };
+    
+    CloseHandle(HFile);
+  } else
+  {
+    Err = PathErrorFromWin32(GetLastError());
+  };
+  
+  if (Error) *Error = Err;
+  return Out;
+};
+
+u32
+PathWriteAll(string Path, const void* Data, usize Length, arena* Arena, path_error* Error)
+{
+  path_error Err = PathErrorNone;
+  
+  if (!Data) Length = 0;
+  
+  HANDLE HFile = 0;
+  u32 Out = 0;
+  TempScope(Arena)
+  {
+    stringw Pathw = StringToW(Path, Arena);
+    HFile = CreateFileW(
+      Pathw.Value, GENERIC_WRITE, 0, NULL,
+      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL
+    );
+  };
+  
+  if (HFile != INVALID_HANDLE_VALUE)
+  {
+    usize i = 0;
+    const u8* p = Data;
+    
+    while (i < Length)
+    {
+      DWORD ToWrite = MinU((~((DWORD)0) - 1), Length - i);
+      DWORD Written = 0;
+      
+      if (!WriteFile(HFile, p + i, ToWrite, &Written, 0)) break;
+      
+      if (!Written) break;
+      
+      i += Written;
+    };
+    
+    Out = (i == Length);
+    CloseHandle(HFile);
+  };
+  
+  if (!Out)
+  {
+    Err = PathErrorFromWin32(GetLastError());
+    Out = 0;
+  };
+  
+  if (Error) *Error = Err;
+  
+  return Out;
+};
+
+u32
+PathDeleteFile(string Path, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  u32 Ok = !!DeleteFileW(Pathw.Value);
+  TempEnd(Temp);
+  path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
+  if (Error) *Error = Err;
+  return Ok;
+};
+
+static u32
+PathCopyFile_(stringw Src, stringw Dest, u32 Overwrite, path_error* Error)
+{
+  u32 Ok = !!CopyFileW(Src.Value, Dest.Value, Overwrite != 0);
+  path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
+  if (Error) *Error = Err;
+  return Ok;
+};
+
+u32
+PathCopyFile(string Src, string Dest, u32 Overwrite, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Srcw = StringToW(Src, Temp.Arena);
+  stringw Destw = StringToW(Dest, Temp.Arena);
+  u32 Ok = PathCopyFile_(Srcw, Destw, Overwrite, Error);
+  TempEnd(Temp);
+  return Ok;
+};
+
+static u32
+PathMove_(stringw Src, stringw Dest, u32 Replace, path_error* Error)
+{
+  u32 Ok = !!MoveFileExW(
+    Src.Value, Dest.Value,
+    (Replace? MOVEFILE_REPLACE_EXISTING : 0) |
+    MOVEFILE_COPY_ALLOWED |
+    MOVEFILE_WRITE_THROUGH
+  );
+
+  path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
+
+  if (Error) *Error = Err;
+  return Ok;
+};
+
+u32
+PathMoveFile(string Src, string Dest, u32 Replace, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  u32 Ok = PathMove_(
+    StringToW(Src, Temp.Arena),
+    StringToW(Dest, Temp.Arena),
+    Replace,
+    Error
+  );
+  TempEnd(Temp);
+  return Ok;
+};
+
+static u32
+PathCreateFolder_(stringw Path, u32 ExistOk, path_error* Error)
+{
+  u32 Ok = !!CreateDirectoryW(Path.Value, NULL);
+  path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
+  if (Err == PathErrorAlreadyExists && ExistOk) Err = PathErrorNone;
+  if (Error) *Error = Err;
+  return Ok;
+};
+
+u32
+PathCreateFolder(string Path, u32 ExistOk, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  u32 Ok = PathCreateFolder_(Pathw, ExistOk, Error);
+  TempEnd(Temp);
+  return Ok;
+};
+
+static u32
+PathDeleteFolder_(stringw Path, u32 Recursive, path_error* Error)
+{
+  u32 Ok = !!RemoveDirectoryW(Path.Value); // TODO: Handle recursive
+  path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
+  if (Error) *Error = Err;
+  return Ok;
+};
+
+u32
+PathDeleteFolder(string Path, u32 Recursive, path_error* Error)
+{  
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  u32 Ok = PathDeleteFolder_(Pathw, Recursive, Error);
+  TempEnd(Temp);
+  return Ok;
+};
+
+u32
+PathCopyFolder_(arena* Arena, stringw Src, stringw Dest, u32 Overwrite, u32 Recursive, path_error* Error)
+{
+  u32 Ok = 0;
+  path_error Err = PathErrorNone;
+  WIN32_FIND_DATAW FindData = {0};
+  HANDLE HFind = INVALID_HANDLE_VALUE;
+
+  TempScope(Arena)
+  {
+    stringw Pattern = StringwF(Arena, L"%ls\\*", Src.Value);
+    HFind = FindFirstFileW(Pattern.Value, &FindData);
+    Ok = 1;
+  };
+
+  if (HFind != INVALID_HANDLE_VALUE)
+  {
+    if (PathCreateFolder_(Dest, Overwrite, &Err))
+    {
+      do
+      {
+        if (!StringwEqualC(FindData.cFileName, L"..") && !StringwEqualC(FindData.cFileName, L"."))
+        {
+          if (!(FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+          {
+            TempScope(Arena)
+            {
+              Ok = PathCopyFile_(
+                StringwF(Arena, L"%ls\\%ls", Src.Value, FindData.cFileName), 
+                StringwF(Arena, L"%ls\\%ls", Dest.Value, FindData.cFileName),
+                Overwrite, &Err
+              );
+            };
+          } else if (Recursive)
+          {
+            TempScope(Arena)
+            {
+              Ok = PathCopyFolder_(
+                Arena,
+                StringwF(Arena, L"%ls\\%ls", Src.Value, FindData.cFileName),
+                StringwF(Arena, L"%ls\\%ls", Dest.Value, FindData.cFileName),
+                Overwrite, Recursive, &Err
+              );
+            };
+          };
+        };
+        
+      } while (Ok && FindNextFileW(HFind, &FindData));
+    };
+    CloseHandle(HFind);
+  };
+  
+  if (!Ok && !Err)
+  {
+    Err = PathErrorFromWin32(GetLastError());
+  };
+  if (Error) *Error = Err;
+  return Ok;
+};
+
+u32
+PathCopyFolder(string Src, string Dest, u32 Overwrite, u32 Recursive, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  u32 Ok = PathCopyFolder_(
+    Temp.Arena, StringToW(Src, Temp.Arena), 
+    StringToW(Dest, Temp.Arena),
+    Overwrite, Recursive, Error
+  );
+  TempEnd(Temp);
+  return Ok;
+};
+
+u32
+PathMoveFolder(string Src, string Dest, u32 Replace, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  u32 Ok = PathMove_(
+    StringToW(Src, Temp.Arena),
+    StringToW(Dest, Temp.Arena),
+    Replace,
+    Error
+  );
+  TempEnd(Temp);
+  return Ok;
+};
+
+strings
+PathListDir_(arena* Stack, stringw Path, arena* Arena, path_error* Error)
+{
+  strings Out = {0};
+  u32 Ok = 0;
+  path_error Err = PathErrorNone;
+  WIN32_FIND_DATAW FindData = {0};
+  HANDLE HFind = INVALID_HANDLE_VALUE;
+
+  TempScope(Stack)
+  {
+    stringw Pattern = StringwF(Arena, L"%ls\\*", Path.Value);
+    HFind = FindFirstFileW(Pattern.Value, &FindData);
+    Ok = 1;
+  };
+
+  if (HFind != INVALID_HANDLE_VALUE)
+  {
+    strings_list List = StringsListBegin(Stack, 0x400);
+
+    do
+    {
+      if (!StringwEqualC(FindData.cFileName, L"..") && !StringwEqualC(FindData.cFileName, L"."))
+      {
+        string Dir = {0};
+        TempScope(Stack)
+        {
+          Dir = StringFromW(StringwF(Stack, L"%ls\\%ls", Path.Value, FindData.cFileName), Arena);
+        };
+        Ok = StringsListPush(&List, Dir);
+      };
+      
+    } while (Ok && FindNextFileW(HFind, &FindData));
+    
+    if (List.NoResize)
+    {
+      Ok = 0;
+      Err = PathErrorAllocationFailed;
+    } else
+    {
+      Out = StringsListEnd(&List, Arena);
+    };
+
+    CloseHandle(HFind);
+  };
+  
+  if (!Ok && !Err)
+  {
+    Err = PathErrorFromWin32(GetLastError());
+  };
+  if (Error) *Error = Err;
+
+  return Out;
+};
+
+string*
+PathListDir(string Path, usize* Count, arena* Arena, path_error* Error)
+{
+  temp Temp = TempBegin(ArenaGetScratch(&Arena, 1));
+  strings Out = PathListDir_(Temp.Arena, StringToW(Path, Temp.Arena), Arena, Error);
+  if (Count) *Count = Out.Length;
+  return Out.Items;
+};
+
+strings
+PathListDirs(string Path, arena* Arena, path_error* Error)
+{
+  
+  temp Temp = TempBegin(ArenaGetScratch(&Arena, 1));
+  strings Out = PathListDir_(Temp.Arena, StringToW(Path, Temp.Arena), Arena, Error);
+  return Out;
+};
+
+#else
+
+string
+PathGetWorkingDirectory(void)
+{
+  string Out = {0};
+  return Out;
+};
+
+string
+PathGetExecutablePath(void)
+{
+  string Out = {0};
+  return Out;
+};
+
+string
+PathGetExecutableFolder(void)
+{
+  string Out = {0};
+  return Out;
+};
+
+
+string
+PathNormalize(string Path, arena* Arena)
+{
+  string Out = {0};
+  return Out;
+};
+
+
+u32
+PathExists(string Path)
+{
+  return 0;
+};
+
+u32
+PathIsFolder(string Path)
+{
+  return 0;
+};
+
+u32
+PathIsFile(string Path)
+{
+  return 0;
+};
+
+string
+PathReadAll(string Path, path_error* Error, arena* Arena)
+{
+  string Out = {0};
+  return Out;
+};
+
+u32
+PathWriteAll(string Path, const void* Data, usize Length, arena* Arena, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathDeleteFile(string Path, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathCopyFile(string SrcPath, string DestPath, u32 Overwrite, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathMoveFile(string Source, string Dest, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathCreateFolder(string Path, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathDeleteFolder(string Path, u32 Recursive, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathCopyFolder(string SrcPath, string DestPath, u32 Overwrite, path_error* Error)
+{
+  return 0;
+};
+
+u32
+PathMoveFolder(string SrcPath, string DestPath, path_error* Error)
+{
+  return 0;
+};
+
+string*
+PathListDir_(string Path, usize* Count, arena* Arena, path_error* Error)
+{
+  if (Count) *Count = 0;
+  return 0;
+};
+
+strings
+PathListDir(string Path, arena* Arena, path_error* Error)
+{
+  strings Out = {0};
+  return Out;
+};
+
+#endif
