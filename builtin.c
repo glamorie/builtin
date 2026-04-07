@@ -2941,7 +2941,11 @@ PathIsFolder(string Path)
 u32
 PathIsFile(string Path)
 {
-  return !PathIsFolder(Path);
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  stringw Pathw = StringToW(Path, Temp.Arena);
+  DWORD FileAttr = GetFileAttributesW(Pathw.Value);
+  TempEnd(Temp);
+  return FileAttr != INVALID_FILE_ATTRIBUTES && (FileAttr & FILE_ATTRIBUTE_DIRECTORY) == 0;
 };
 
 static inline path_error 
