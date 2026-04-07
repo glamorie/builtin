@@ -3152,7 +3152,7 @@ PathCreateFolder_(stringw Path, u32 ExistOk, path_error* Error)
 {
   u32 Ok = !!CreateDirectoryW(Path.Value, NULL);
   path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
-  if (Err == PathErrorAlreadyExists && ExistOk) Err = PathErrorNone;
+  if (Err == PathErrorAlreadyExists && ExistOk) Err = PathErrorNone, Ok = 1;
   if (Error) *Error = Err;
   return Ok;
 };
