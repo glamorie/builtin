@@ -1607,6 +1607,48 @@ StringCountUtf16(string String)
   return Count;
 };
 
+internal usize
+StringPeekLine(const u8* Value, usize Length)
+{
+  usize Span = 0;
+  
+  switch (Value[0])
+  {
+    case '\r':
+    {
+      if (1 < Length && Value[1] == '\n') Span = 2;
+      else Span = 1;
+    } break;
+    case '\n':
+    case '\v': 
+    case '\f': Span = 1; break;
+  };
+  return Span;
+};
+
+usize
+StringCountLines(string String)
+{
+  usize Out = 0;
+  usize i = 0;
+  
+  while (i < String.Length)
+  {
+    usize x = i;
+    usize Line = 0;
+    while (i < String.Length)
+    {
+      Line = StringPeekLine(String.Value + i, String.Length - i);
+      if (Line) break;
+      i++;
+    };
+    Out++;
+    i += Line;
+  };
+  
+  return Out;
+};
+
 usize
 StringwCountUtf8(stringw String)
 {
@@ -1787,76 +1829,36 @@ StringSplitSpace(string String, arena* Arena)
   return Out;
 };
 
-internal usize
-StringPeekLine(const u8* Value, usize Length)
-{
-  usize Span = 0;
-  
-  switch (Value[0])
-  {
-    case '\r':
-    {
-      if (1 < Length && Value[1] == '\n') Span = 2;
-      else Span = 1;
-    } break;
-    case '\n':
-    case '\v': 
-    case '\f': Span = 1; break;
-  };
-  return Span;
-};
-
 string*
 StringSplitLines_(string String, usize* Count, u32 KeepEnds, arena* Arena)
 {
-  usize ACount = 0;
-  
-  for (usize i = 0; 1;)
-  {
-    usize x = i;
-    u32 LineSpan = 0;
-    
-    while (i < String.Length)
-    {
-      LineSpan = StringPeekLine(String.Value + i, String.Length - i);
-      if (LineSpan) break;
-      i++;
-    };
-    
-    usize L = i - x;
-    
-    if (!L) break;
-    x += LineSpan;
-    ACount++;
-  };
-  
-  string* Out = ArenaPushN(Arena, sizeof(string), ACount, alignof(string));
-  
+  string* Out = 0;
+  usize Length = 0;
+  usize Lines = StringCountLines(String);
+  Out = ArenaPushN(Arena, sizeof(string), Lines, alignof(string));
   if (Out)
   {
-    usize k = 0;
-    for (usize i = 0; 1;)
+    usize i = 0;
+    usize y = 0;
+    while (i < String.Length)
     {
       usize x = i;
-      u32 LineSpan = 0;
-      
+      usize Line = 0;
       while (i < String.Length)
       {
-        LineSpan = StringPeekLine(String.Value + i, String.Length - i);
-        if (LineSpan) break;
+        Line = StringPeekLine(String.Value + i, String.Length - i);
+        if (Line) break;
         i++;
       };
-      
-      usize L = i - x + KeepEnds ? LineSpan : 0;
-      if (!L) break;
-      
-      string Line = {String.Value + x, L};
-      Out[k++] = StringClone(Line, Arena);
-      i += LineSpan;
+
+      string Temp = {String.Value + x, i - x + Line * !!KeepEnds};
+      Out[y++] = StringClone(Temp, Arena);
+      i += Line;
     };
+    Length = Lines;
   };
-  
-  if (Count) *Count = ACount;
+
+  if (Count) *Count = Lines;
   return Out;
 };
 
@@ -1867,7 +1869,6 @@ StringSplitLines(string String, u32 KeepEnds, arena* Arena)
   Out.Items = StringSplitLines_(String, &Out.Length, KeepEnds, Arena);
   return Out;
 };
-
 
 internal string
 StringStrip_(string String, u32 Direction, arena* Arena)

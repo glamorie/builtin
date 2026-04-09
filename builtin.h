@@ -612,6 +612,9 @@ StringCountSub(string String, string Substring);
 usize
 StringCountUtf16(string String);
 
+usize
+StringCountLines(string String);
+
 isize
 StringFind(string String, string Substring);
 
