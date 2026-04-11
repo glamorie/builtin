@@ -1790,13 +1790,14 @@ StringSplitSpace_(string String, usize* Count, arena* Arena)
 {
   usize ACount = 0;
   
-  for (usize i = 0; 1; )
+  usize i = 0;
+  while (i < String.Length)
   {
     while (i < String.Length && CharIsSpace(String.Value[i])) i++;
     usize x = i;
     while (i < String.Length && !CharIsSpace(String.Value[i])) i++;
     usize L = i - x;
-    if (L) break;
+    if (!L) continue;
     ACount++;
   };
   
@@ -1805,13 +1806,14 @@ StringSplitSpace_(string String, usize* Count, arena* Arena)
   if (Out)
   {
     usize k = 0;
-    for (usize i = 0; 1; )
+    usize i = 0;
+    while (i < String.Length)
     {
       while (i < String.Length && CharIsSpace(String.Value[i])) i++;
       usize x = i;
       while (i < String.Length && !CharIsSpace(String.Value[i])) i++;
       usize L = i - x;
-      if (L) break;
+      if (!L) continue;      
       string Slice = {String.Value + x, L};
       Out[k++] = StringClone(Slice, Arena);
     };
@@ -1850,14 +1852,14 @@ StringSplitLines_(string String, usize* Count, u32 KeepEnds, arena* Arena)
         if (Line) break;
         i++;
       };
-
+      
       string Temp = {String.Value + x, i - x + Line * !!KeepEnds};
       Out[y++] = StringClone(Temp, Arena);
       i += Line;
     };
     Length = Lines;
   };
-
+  
   if (Count) *Count = Lines;
   return Out;
 };
@@ -2622,13 +2624,13 @@ u32
 StringsListEnsure(strings_list* List)
 {
   if (!List || List->Capacity >  List->Length  || List->NoResize) return List && !List->NoResize;
-
+  
   strings_list_node* Node = ArenaZPush(List->Temp.Arena, sizeof(*Node), alignof(strings_list_node));
-
+  
   if (Node)
   {
     Node->Value = ArenaPushN(List->Temp.Arena, sizeof(string), List->Granularity, alignof(string));
-
+    
     if (Node->Value)
     {
       SLLPush(List, Node);
@@ -2636,7 +2638,7 @@ StringsListEnsure(strings_list* List)
       return 1;
     };
   };
-
+  
   List->NoResize = 1;
   return 0;
 };
@@ -2660,7 +2662,7 @@ StringsListEnd(strings_list* List, arena* Arena)
   if (List)
   {
     Out.Items = ArenaPushN(Arena, sizeof(string), List->Length, alignof(string));
-
+    
     if (Out.Items)
     {
       usize x = 0;
@@ -2721,11 +2723,11 @@ StringwEqualC(const u16* A, const u16* B)
 string
 PathSep(void)
 {
-#if PLATFORM_WINDOWS
+  #if PLATFORM_WINDOWS
   return S("\\");
-#else 
+  #else 
   return S("/");
-#endif
+  #endif
 };
 
 
@@ -3127,9 +3129,9 @@ PathMove_(stringw Src, stringw Dest, u32 Replace, path_error* Error)
     MOVEFILE_COPY_ALLOWED |
     MOVEFILE_WRITE_THROUGH
   );
-
+  
   path_error Err = Ok? PathErrorNone : PathErrorFromWin32(GetLastError());
-
+  
   if (Error) *Error = Err;
   return Ok;
 };
@@ -3194,14 +3196,14 @@ PathCopyFolder_(arena* Arena, stringw Src, stringw Dest, u32 Overwrite, u32 Recu
   path_error Err = PathErrorNone;
   WIN32_FIND_DATAW FindData = {0};
   HANDLE HFind = INVALID_HANDLE_VALUE;
-
+  
   TempScope(Arena)
   {
     stringw Pattern = StringwF(Arena, L"%ls\\*", Src.Value);
     HFind = FindFirstFileW(Pattern.Value, &FindData);
     Ok = 1;
   };
-
+  
   if (HFind != INVALID_HANDLE_VALUE)
   {
     if (PathCreateFolder_(Dest, Overwrite, &Err))
@@ -3282,18 +3284,18 @@ PathListDir_(arena* Stack, stringw Path, arena* Arena, path_error* Error)
   path_error Err = PathErrorNone;
   WIN32_FIND_DATAW FindData = {0};
   HANDLE HFind = INVALID_HANDLE_VALUE;
-
+  
   TempScope(Stack)
   {
     stringw Pattern = StringwF(Arena, L"%ls\\*", Path.Value);
     HFind = FindFirstFileW(Pattern.Value, &FindData);
     Ok = 1;
   };
-
+  
   if (HFind != INVALID_HANDLE_VALUE)
   {
     strings_list List = StringsListBegin(Stack, 0x400);
-
+    
     do
     {
       if (!StringwEqualC(FindData.cFileName, L"..") && !StringwEqualC(FindData.cFileName, L"."))
@@ -3316,7 +3318,7 @@ PathListDir_(arena* Stack, stringw Path, arena* Arena, path_error* Error)
     {
       Out = StringsListEnd(&List, Arena);
     };
-
+    
     CloseHandle(HFind);
   };
   
@@ -3325,7 +3327,7 @@ PathListDir_(arena* Stack, stringw Path, arena* Arena, path_error* Error)
     Err = PathErrorFromWin32(GetLastError());
   };
   if (Error) *Error = Err;
-
+  
   return Out;
 };
 
