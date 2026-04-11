@@ -877,6 +877,7 @@ do \
   if ((List)->Tail) (List)->Tail->Next = (Node); \
   else (List)->Head = (Node); \
   (Node)->Next = (List)->Tail; \
+  (List)->Tail = (Node); \
 } while (0)
 
 #define SLLPopFrontEx(List, Result, Head, Tail, Next) \
