@@ -2722,6 +2722,116 @@ StringwEqualC(const u16* A, const u16* B)
   }
   return A == B;
 };
+
+// Byte buffer
+
+byte_buffer
+ByteBufferBegin(arena* Arena, usize ChunkSize)
+{
+  byte_buffer Out = {0};
+  Out.Arena = Arena;
+  Out.ChunkSize = ChunkSize;
+  Out.ArenaPosition = ArenaPosition(Arena);
+  return Out;
+};
+
+void
+ByteBufferEnd(byte_buffer* Buffer)
+{
+  if (Buffer) ArenaPopTo(Buffer->Arena, Buffer->ArenaPosition);
+};
+
+void
+ByteBufferRead(byte_buffer* Buffer, void* Value, usize Length)
+{
+  if (!Buffer || !Value) return;
+
+  usize i = 0;
+  byte_buffer_node* Node = Buffer->Head;
+
+  while (i < Length && Node)
+  {
+    usize ToRead = MinU(Length - i, Buffer->ChunkSize);
+    MemoryCopy((u8*)Value + i, Node->Value, ToRead);
+    i += ToRead;
+    Node = Node->Next;
+  };
+};
+
+internal u32
+ByteBufferEnsure(byte_buffer* Buffer)
+{
+  if (!Buffer || Buffer->Length < Buffer->Capacity || Buffer->NoResize)
+  {
+    return Buffer && Buffer->Length < Buffer->Capacity;
+  };
+  byte_buffer_node* Node = ArenaZPush(Buffer->Arena, sizeof(*Node), alignof(byte_buffer_node));
+  if (Node)
+  {
+    Node->Value = ArenaPushN(Buffer->Arena, sizeof(u8), Buffer->ChunkSize, alignof(u8));
+    if (Node->Value)
+    {
+      SLLPush(Buffer, Node);
+      Buffer->Capacity += Buffer->ChunkSize;
+    };
+  };
+  return !(Buffer->NoResize = !Node);
+};
+
+void
+ByteBufferPush(byte_buffer* Buffer, u8 Value)
+{
+  if (!Buffer) return;
+
+  if (ByteBufferEnsure(Buffer))
+  {
+    Buffer->Tail->Value[Buffer->Length % Buffer->ChunkSize] = Value;
+    Buffer->Length++;
+  };
+  Buffer->Count++;
+};
+
+void
+ByteBufferPushN(byte_buffer* Buffer, const void* Value, usize Length)
+{
+  if (!Buffer || !Value) return;
+  usize i = 0;
+  while (i < Length && ByteBufferEnsure(Buffer) )
+  {
+    usize Available = Buffer->ChunkSize - Buffer->Length % Buffer->ChunkSize;
+    usize Start = Buffer->ChunkSize - Available;
+    usize ToWrite = MinU(Length - i, Available);
+    MemoryCopy(Buffer->Tail->Value + Start, Value, ToWrite);
+    i += ToWrite;
+  };
+  Buffer->Count += Length;
+};
+
+void
+ByteBufferPushC(byte_buffer* Buffer, const char* Value)
+{
+  ByteBufferPushN(Buffer, Value, StringCLen(Value));
+};
+
+void
+ByteBufferPushFv(byte_buffer* Buffer, const char* Format, va_list Args)
+{
+  if (!Buffer) return;
+  temp Temp = TempBegin(ArenaGetScratch(&Buffer->Arena, 1));
+  string String = StringFv(Format, Args, Temp.Arena);
+  ByteBufferPushN(Buffer, String.Value, String.Length);
+  TempEnd(Temp);
+};
+
+void
+ByteBufferPushF(byte_buffer* Buffer, const char* Format, ...)
+{
+  va_list Args;
+  va_start(Args, Format);
+  ByteBufferPushFv(Buffer, Format, Args);
+  va_end(Args);
+};
+
 // Path layer
 
 string
