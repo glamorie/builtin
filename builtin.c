@@ -2570,20 +2570,24 @@ StringwEncodeUtf8(stringw String, usize* Length, arena* Arena)
   usize OutLen = 0;
   usize Count = StringwCountUtf8(String);
   u8* Out = ArenaPushN(Arena, sizeof(u8), Count + 1, alignof(u8));
-  usize x = 0;
-  for (usize i = 0; i < String.Length; i++)
+  if (Out)
   {
-    usize Advance = CharUtf16Advance(String.Value[i]);
-    
-    if (Advance && i + Advance <= String.Length)
+    usize x = 0;
+    for (usize i = 0; i < String.Length; i++)
     {
-      u32 Char = CharUtf16Decode_(String.Value + i);
-      x += CharUtf8Encode_(Char, Out + x);      
-    } else
-    {
-      Advance = 1;
-      Out[x++] = String.Value[i] & 0xFF; // Maybe write '?'
+      usize Advance = CharUtf16Advance(String.Value[i]);
+      
+      if (Advance && i + Advance <= String.Length)
+      {
+        u32 Char = CharUtf16Decode_(String.Value + i);
+        x += CharUtf8Encode_(Char, Out + x);      
+      } else
+      {
+        Advance = 1;
+        Out[x++] = String.Value[i] & 0xFF; // Maybe write '?'
+      };
     };
+    OutLen = Count;
   };
   if (Length) *Length = OutLen;
   return Out;
