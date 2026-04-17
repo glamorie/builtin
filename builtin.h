@@ -779,6 +779,47 @@ StringsListPush(strings_list* List, string Value);
 strings
 StringsListEnd(strings_list* List, arena* Arena);
 
+typedef struct byte_buffer_node byte_buffer_node;
+struct byte_buffer_node
+{
+  byte_buffer_node* Next;
+  u8* Value;
+};
+
+typedef struct byte_buffer byte_buffer;
+struct byte_buffer
+{
+  arena* Arena;
+  usize ArenaPosition;
+  byte_buffer_node* Head;
+  byte_buffer_node* Tail;
+  usize ChunkSize;
+  usize Length;
+  usize Capacity;
+  usize Count; // Attempted writes
+  u32 NoResize;
+};
+
+byte_buffer
+ByteBufferBegin(arena* Arena, usize ChunkSize);
+
+void
+ByteBufferEnd(byte_buffer* Buffer);
+
+void
+ByteBufferRead(byte_buffer* Buffer, void* Value, usize Length);
+
+void
+ByteBufferPush(byte_buffer* Buffer, u8 Value);
+
+void
+ByteBufferPushFv(byte_buffer* Buffer, const char* Format, va_list Args);
+
+void
+ByteBufferPushN(byte_buffer* Buffer, const void* Value, usize Length);
+
+void
+ByteBufferPushF(byte_buffer* Buffer, const char* Format, ...);
 
 #define DLLPushFrontEx(List, Node, Head, Tail, Prev, Next) \
 do \
