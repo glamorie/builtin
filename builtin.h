@@ -234,6 +234,11 @@ typedef i64 isize;
 
 #define Swap(T, a, b) do { T __t = a; a = b; b = __t; } while (0)
 
+#define KiB(n)  (((u64)(n)) << 10)
+#define MiB(n)  (((u64)(n)) << 20)
+#define GiB(n)  (((u64)(n)) << 30)
+#define TiB(n)  (((u64)(n)) << 40)
+
 inline i64
 MinI(i64 a, i64 b)
 {
@@ -1101,5 +1106,8 @@ PathListDir(string Path, usize* Count, arena* Arena, path_error* Error);
 
 strings
 PathListDirs(string Path, arena* Arena, path_error* Error);
+
+string
+ConsoleReadLine(arena* Arena);
 
 #endif /* BUILTIN_H*/
