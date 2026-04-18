@@ -1110,4 +1110,7 @@ PathListDirs(string Path, arena* Arena, path_error* Error);
 string
 ConsoleReadLine(arena* Arena);
 
+void
+ConsoleClear(void);
+
 #endif /* BUILTIN_H*/

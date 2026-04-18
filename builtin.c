@@ -2907,6 +2907,25 @@ ConsoleReadLine(arena* Arena)
   return Out;
 };
 
+void
+ConsoleClear(void)
+{
+  HANDLE ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+  COORD ScreenCoords = {0};
+  DWORD Written;
+  CONSOLE_SCREEN_BUFFER_INFO ConsoleBufferInfo;
+  DWORD ConsoleSize;
+  
+  if (GetConsoleScreenBufferInfo(ConsoleHandle, &ConsoleBufferInfo))
+  {
+    ConsoleSize = ConsoleBufferInfo.dwSize.X * ConsoleBufferInfo.dwSize.Y;
+    FillConsoleOutputCharacterW(ConsoleHandle, (TCHAR)' ', ConsoleSize, ScreenCoords, &Written) &&
+    GetConsoleScreenBufferInfo(ConsoleHandle, &ConsoleBufferInfo) &&
+    FillConsoleOutputAttribute(ConsoleHandle, ConsoleBufferInfo.wAttributes, ConsoleSize, ScreenCoords, &Written) &&
+    SetConsoleCursorPosition(ConsoleHandle, ScreenCoords);
+  };
+};
+
 #else
 string 
 ConsoleReadLine(arena* Arena)
