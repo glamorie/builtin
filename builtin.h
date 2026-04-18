@@ -1113,4 +1113,14 @@ ConsoleReadLine(arena* Arena);
 void
 ConsoleClear(void);
 
+void
+ConsoleGetSize(int* Width, int* Height);
+
+int
+ConsoleGetWidth(void);
+
+int
+ConsoleGetHeight(void);
+
+
 #endif /* BUILTIN_H*/

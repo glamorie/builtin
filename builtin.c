@@ -2926,12 +2926,61 @@ ConsoleClear(void)
   };
 };
 
+
+void
+ConsoleGetSize(int* Width, int* Height)
+{
+  HANDLE Console = GetStdHandle(STD_OUTPUT_HANDLE);
+  CONSOLE_SCREEN_BUFFER_INFO ConsoleBufferInfo = {0};
+  int w = 0, h = 0;
+
+  if (GetConsoleScreenBufferInfo(Console, &ConsoleBufferInfo))
+  {
+    w = ConsoleBufferInfo.dwSize.X;
+    h = ConsoleBufferInfo.dwSize.Y;
+  };
+
+  if (Width) *Width = w;
+  if (Height) *Height = h;
+};
+
+int
+ConsoleGetWidth(void)
+{
+  int Width, Height;
+  ConsoleGetSize(&Width, &Height);
+  return Width;
+};
+
+int
+ConsoleGetHeight(void)
+{  
+  int Width, Height;
+  ConsoleGetSize(&Width, &Height);
+  return Height;
+};
+
+
 #else
 string 
 ConsoleReadLine(arena* Arena)
 {
   string Out = {0};
   return Out;
+};
+
+void
+ConsoleClear(void)
+{
+
+};
+
+void
+ConsoleGetSize(int* Width, int* Height)
+{
+  int w = 0, h = 0;
+  if (Width) *Width = w;
+  if (Height) *Height = h;
 };
 #endif
 
