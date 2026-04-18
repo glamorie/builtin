@@ -2832,6 +2832,90 @@ ByteBufferPushF(byte_buffer* Buffer, const char* Format, ...)
   va_end(Args);
 };
 
+// Console reading
+
+#if PLATFORM_WINDOWS
+typedef struct console_read_context console_read_context;
+struct console_read_context
+{
+  u8 Value[KiB(4)];
+  usize Start;
+  usize Length;
+};
+
+threadlocal console_read_context GlobalConsoleReadContext = {0};
+
+internal u32 // returns whether or not to continue reading or not
+ConsoleReadLineFlush(byte_buffer* Buffer)
+{
+  u32 FoundLine = 0;
+  usize i = GlobalConsoleReadContext.Start;
+  GlobalConsoleReadContext.Start = 0;
+  for (; i < GlobalConsoleReadContext.Length; i++)
+  {
+    if (GlobalConsoleReadContext.Value[i] == '\r')
+    {
+      GlobalConsoleReadContext.Start = i + 1;
+      if (i + 1 < GlobalConsoleReadContext.Length && GlobalConsoleReadContext.Value[i + 1] == '\n')
+      {
+        GlobalConsoleReadContext.Start = i + 2;
+      };
+      FoundLine = 1;
+      break;
+    } else if (GlobalConsoleReadContext.Value[i] == '\n')
+    {
+      GlobalConsoleReadContext.Start = i + 1;
+      FoundLine = 1;
+      break;
+    };
+    ByteBufferPush(Buffer, GlobalConsoleReadContext.Value[i]);
+  };
+  return FoundLine;
+};
+
+string
+ConsoleReadLine(arena* Arena)
+{
+  string Out = {0};
+  HANDLE Console = GetStdHandle(STD_INPUT_HANDLE);
+  DWORD Read = 0;
+  WCHAR WideBuffer[ArrayLen(GlobalConsoleReadContext.Value) / 2];
+  u32 Reading = 1;
+
+
+  if (Console != INVALID_HANDLE_VALUE)
+  {
+    byte_buffer Buffer = ByteBufferBegin(ArenaGetScratch(&Arena, 1), KiB(10));
+    Reading = !ConsoleReadLineFlush(&Buffer);
+
+    while (Reading && ReadConsoleW(Console, WideBuffer, ArrayLen(WideBuffer), &Read, 0) && Read > 0)
+    {
+      GlobalConsoleReadContext.Length = WideCharToMultiByte(CP_UTF8, 0, WideBuffer, Read, (LPSTR)GlobalConsoleReadContext.Value, ArrayLen(GlobalConsoleReadContext.Value), 0, 0);
+      Reading = !ConsoleReadLineFlush(&Buffer);
+    };
+
+    Out.Value = ArenaPushN(Arena, sizeof(u8), Buffer.Length + 1, alignof(u8));
+
+    if (Out.Value)
+    {
+      Out.Length = Buffer.Length;
+      ByteBufferRead(&Buffer, Out.Value, Out.Length);
+      Out.Value[Out.Length] = 0;
+    };
+    ByteBufferEnd(&Buffer);
+  };
+  return Out;
+};
+
+#else
+string 
+ConsoleReadLine(arena* Arena)
+{
+  string Out = {0};
+  return Out;
+};
+#endif
+
 // Path layer
 
 string
