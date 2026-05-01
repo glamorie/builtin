@@ -2,7 +2,13 @@
 #include <smmintrin.h>
 #if PLATFORM_WINDOWS
 #include <Windows.h>
+#include <sal.h>
+#include <ShlObj.h>
+#include <tlhelp32.h>
+
 #pragma comment(lib, "onecore.lib")
+#pragma comment(lib, "Kernel32.lib")
+#pragma comment(lib, "User32.lib")
 #else 
 #include <stdlib.h>
 #endif 
@@ -224,7 +230,250 @@ PlatformRelease(void* Base)
   VirtualFree(Base, 0, MEM_FREE);
 };
 
+string
+PlatformGetEnv(string Name, arena* Arena)
+{
+  temp Temp = TempBegin(ArenaGetScratch(&Arena, 1));
+  stringw NameW = StringToW(Name, Arena);
+
+  DWORD Length = GetEnvironmentVariableW(NameW.Value, 0, 0);
+  stringw Buffer = {0};
+  Buffer.Value = ArenaPushN(Temp.Arena, sizeof(u16), Length + 1, alignof(u16));
+
+  if (Buffer.Value)
+  {
+    Buffer.Length = Length;
+    GetEnvironmentVariableW(NameW.Value, Buffer.Value, Length + 1);
+    Buffer.Value[Length] = 0;
+  };
+
+  string Out = StringFromW(Buffer, Arena);
+  TempEnd(Temp);
+
+  return Out;
+};
+
+u32
+PlatformSetEnv(string Name, string Value)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+
+  stringw NameW = StringToW(Name, Temp.Arena);
+  stringw ValueW = StringToW(Value, Temp.Arena);
+  BOOL Out = SetEnvironmentVariableW(NameW.Value, ValueW.Value);
+  TempEnd(Temp);
+  return !!Out;
+};
+
+string
+PlatformGetComputerName(arena* Arena)
+{
+  temp Temp = TempBegin(ArenaGetScratch(0, 0));
+  DWORD Length = 0;
+  GetComputerNameExW(ComputerNameDnsFullyQualified, 0, &Length);
+  stringw Buffer = {0};
+  Buffer.Value = ArenaPushN(Temp.Arena, sizeof(u16), Length + 1, alignof(u16));
+  if (Buffer.Value)
+  {
+    GetComputerNameExW(ComputerNameDnsFullyQualified, Buffer.Value, &Length);
+    Buffer.Length = Length;
+    Buffer.Value[Length] = 0;
+  };
+  string Out = StringFromW(Buffer, Arena);
+  TempEnd(Temp);
+  return Out;
+};
+
+string
+PlatformGetUserProfile(arena* Arena)
+{
+  u16 Buffer[MAX_PATH] = {0};
+  HRESULT Result = SHGetFolderPathW(NULL, CSIDL_PROFILE, NULL, 0, Buffer);
+  stringw Wide = {Buffer, StringWLen(Buffer)};
+  string Out = StringFromW(Wide, Arena);
+  return Out;
+};
+
+u32
+PlatformGetPID(void)
+{
+  return GetCurrentProcessId();
+};
+
+u32
+PlatformGetParentPID(u32 PID)
+{
+  DWORD Out = 0;
+
+  if (PID)
+  {
+    HANDLE SnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    
+    if (SnapShot != INVALID_HANDLE_VALUE)
+    {
+      PROCESSENTRY32 Entry = {0};
+      Entry.dwSize = sizeof(Entry);
+      
+      if (Process32First(SnapShot, &Entry))
+      {
+        do 
+        {
+          if (Entry.th32ProcessID == PID)
+          {
+            Out = Entry.th32ParentProcessID;
+            break;
+          };
+        } while(Process32Next(SnapShot, &Entry));
+      };
+      CloseHandle(SnapShot);
+    };
+  };
+  return Out;
+};
+
+u32
+PlatformKill(u32 PID, u32 ExitCode)
+{
+  HANDLE Handle = OpenProcess(PROCESS_TERMINATE, FALSE, PID);
+  u32 Out = 0;
+  if (Handle)
+  {
+    Out = !!TerminateProcess(Handle, ExitCode);
+    CloseHandle(Handle);
+  };
+  return Out;
+};
+
+void
+PlatformSleep(u32 Milliseconds)
+{
+  Sleep(Milliseconds);
+};
+
+
+u64
+PlatformGetTimeMicroseconds(void)
+{
+  FILETIME Time = {0};
+  GetSystemTimeAsFileTime(&Time);
+  ULARGE_INTEGER Val = {0};
+  Val.LowPart = Time.dwLowDateTime;
+  Val.HighPart = Time.dwHighDateTime;
+  u64 Out = Val.QuadPart / 10;
+  return Out;
+};
+
+u64
+PlatformGetTimeMilliseconds(void)
+{
+  SYSTEMTIME Time = {0};
+  GetSystemTime(&Time);
+  u64 Out = Time.wMilliseconds;
+  return Out;
+};
+
+u32
+PlatformGetCPUCount(void)
+{
+  SYSTEM_INFO Info = {0};
+  GetSystemInfo(&Info);
+  return Info.dwNumberOfProcessors;
+};
+
+string
+PlatformGetUserName(arena* Arena)
+{
+  temp Temp = TempBegin(ArenaGetScratch(&Arena, 1));
+  DWORD Length = 0;
+  GetUserNameW(0, &Length);
+  stringw Buffer = {0};
+  Buffer.Value = ArenaPushN(Arena, sizeof(u16), Length, alignof(u16));
+
+  if (Buffer.Value)
+  {
+    Buffer.Length = Length - 1;
+    GetUserNameW(Buffer.Value, &Length);
+    Buffer.Value[Length - 1] = 0;
+  };
+
+  string Out = StringFromW(Buffer, Arena);
+  TempEnd(Temp);
+
+  return Out;
+};
+
+
 #else // PLATFORM_UNKNOWN
+string
+PlatformGetUserName(arena* Arena)
+{
+  string Out = {0};
+  return Out;
+};
+
+u32
+PlatformGetCPUCount(void)
+{
+  return 0;
+};
+
+u64
+PlatformGetTimeMicroseconds(void)
+{
+  return 0;
+};
+
+u64
+PlatformGetTimeMilliseconds(void)
+{
+  return 0;
+};
+
+u32
+PlatformGetParentPID(void)
+{
+  return 0;
+};
+
+u32
+PlatformGetParentPID(u32 PID)
+{
+  return 0;
+};
+
+u32
+PlatformGetPID(void)
+{
+  return 0;
+};
+
+string
+PlatformGetUserProfile(arena* Arena)
+{
+  string Out = {0};
+  return Out;
+};
+
+string
+PlatformGetComputerName(arena* Arena)
+{
+  string Out = {0};
+  return Out;
+};
+
+string
+PlatformGetEnv(string Name, arena* Arena)
+{
+  const char* Value = getenv((char*)Name.Value);
+  string Out = StringC(Value, Arena);
+  return Out;  
+};
+
+u32
+PlatformSetEnv(string Name, string Value)
+{
+  return setenv((char*)Name.Value, (char*)Value.Value, 1) != -1;
+};
 
 usize
 PlatformLargePageSize(void)

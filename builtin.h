@@ -1122,5 +1122,40 @@ ConsoleGetWidth(void);
 int
 ConsoleGetHeight(void);
 
+string
+PlatformGetEnv(string Name, arena* Arena);
+
+u32
+PlatformSetEnv(string Name, string Value);
+
+string
+PlatformGetComputerName(arena* Arena);
+
+string
+PlatformGetUserProfile(arena* Arena);
+
+string
+PlatformGetUserName(arena* Arena);
+
+u32
+PlatformGetPID(void);
+
+u32
+PlatformGetParentPID(u32 PID);
+
+u32
+PlatformKill(u32 PID, u32 ExitCode);
+
+void
+PlatformSleep(u32 Milliseconds);
+
+u64
+PlatformGetTimeMicroseconds(void);
+
+u64
+PlatformGetTimeMilliseconds(void);
+
+u32
+PlatformGetCPUCount(void);
 
 #endif /* BUILTIN_H*/
